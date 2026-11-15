@@ -1,0 +1,3251 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>SPLAT // 2D Turf Battle</title>
+  <style>
+    :root {
+      --orange: #ff7a00;
+      --blue: #3b82f6;
+      --lime: #86d46b;
+      --ink: #3b82f6;
+      --slate: #3b82f6;
+      --fog: #ffffff;
+      --cream: #ffffff;
+      --yellow: #ff7a00;
+      --red: #ff7a00;
+      --brown: #3b82f6;
+      --white: #ffffff;
+      --scale: 1;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 22% 20%, rgba(255, 122, 0, 0.13), transparent 32%),
+        radial-gradient(circle at 78% 76%, rgba(59, 130, 246, 0.15), transparent 36%),
+        #3b82f6;
+      color: var(--cream);
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
+      user-select: none;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+    }
+
+    #gameFrame {
+      position: relative;
+      box-sizing: content-box;
+      width: calc(480px * var(--scale));
+      height: calc(270px * var(--scale));
+      overflow: hidden;
+      background: var(--white);
+      border: max(2px, calc(2px * var(--scale))) solid var(--ink);
+      outline: max(1px, calc(1px * var(--scale))) solid rgba(255, 255, 255, 0.34);
+      box-shadow:
+        0 calc(10px * var(--scale)) calc(40px * var(--scale)) rgba(255, 255, 255, 0.24),
+        0 0 0 max(3px, calc(4px * var(--scale))) rgba(255, 255, 255, 0.42);
+      image-rendering: pixelated;
+      isolation: isolate;
+    }
+
+    #gameCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: var(--white);
+      image-rendering: crisp-edges;
+      image-rendering: pixelated;
+      outline: none;
+      touch-action: none;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(8px, calc(14px * var(--scale)), 42px);
+      background:
+        linear-gradient(135deg, rgba(255, 122, 0, 0.18), transparent 42%),
+        linear-gradient(315deg, rgba(59, 130, 246, 0.22), transparent 44%),
+        rgba(59, 130, 246, 0.94);
+      text-align: center;
+      line-height: 1.45;
+      backdrop-filter: blur(2px);
+    }
+
+    .overlay.hidden {
+      display: none;
+    }
+
+    .panel {
+      width: min(100%, 760px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: clamp(5px, calc(7px * var(--scale)), 18px);
+    }
+
+    .eyebrow {
+      color: var(--yellow);
+      font-size: clamp(8px, calc(5px * var(--scale)), 17px);
+      font-weight: 800;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2 {
+      margin: 0;
+      color: var(--cream);
+      font-family: "Courier New", monospace;
+      font-weight: 900;
+      line-height: 0.95;
+      letter-spacing: -0.05em;
+      text-shadow:
+        max(2px, calc(2px * var(--scale))) max(2px, calc(2px * var(--scale))) 0 var(--ink),
+        max(5px, calc(5px * var(--scale))) max(5px, calc(5px * var(--scale))) 0 rgba(255, 122, 0, 0.35);
+    }
+
+    h1 {
+      font-size: clamp(26px, calc(24px * var(--scale)), 86px);
+    }
+
+    h2 {
+      font-size: clamp(20px, calc(16px * var(--scale)), 58px);
+    }
+
+    .subtitle {
+      max-width: 640px;
+      margin: 0;
+      color: var(--fog);
+      font-size: clamp(9px, calc(5.4px * var(--scale)), 18px);
+    }
+
+    .team-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: clamp(7px, calc(8px * var(--scale)), 22px);
+      font-family: "Courier New", monospace;
+      font-size: clamp(8px, calc(5px * var(--scale)), 16px);
+      font-weight: 800;
+      letter-spacing: 0.08em;
+    }
+
+    .team-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5em;
+    }
+
+    .swatch {
+      width: 1.1em;
+      height: 1.1em;
+      border: max(1px, calc(1px * var(--scale))) solid var(--ink);
+      box-shadow: 0.18em 0.18em 0 var(--ink);
+      transform: rotate(-4deg);
+    }
+
+    .swatch.orange {
+      background: var(--orange);
+    }
+
+    .swatch.blue {
+      background: var(--blue);
+    }
+
+    .swatch.lime {
+      background: var(--lime);
+    }
+
+    .controls {
+      width: min(100%, 660px);
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: clamp(4px, calc(4px * var(--scale)), 12px);
+      padding: clamp(7px, calc(8px * var(--scale)), 18px);
+      border: max(1px, calc(1px * var(--scale))) solid rgba(255, 255, 255, 0.22);
+      background: rgba(59, 130, 246, 0.8);
+      box-shadow: inset 0 0 0 max(1px, calc(1px * var(--scale))) rgba(255, 255, 255, 0.05);
+      color: var(--fog);
+      font-size: clamp(8px, calc(4.8px * var(--scale)), 15px);
+      text-align: left;
+    }
+
+    .control-line {
+      display: flex;
+      align-items: center;
+      gap: 0.5em;
+      min-width: 0;
+    }
+
+    kbd {
+      flex: 0 0 auto;
+      min-width: 2.3em;
+      padding: 0.15em 0.4em;
+      border: 1px solid var(--slate);
+      border-bottom-width: 3px;
+      border-radius: 2px;
+      background: var(--cream);
+      color: var(--ink);
+      font-family: "Courier New", monospace;
+      font-size: 0.92em;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    button {
+      appearance: none;
+      position: relative;
+      min-width: clamp(112px, calc(88px * var(--scale)), 260px);
+      padding: clamp(6px, calc(5px * var(--scale)), 16px) clamp(14px, calc(12px * var(--scale)), 36px);
+      border: max(1px, calc(2px * var(--scale))) solid var(--ink);
+      border-radius: 0;
+      background: var(--yellow);
+      box-shadow:
+        max(2px, calc(3px * var(--scale))) max(2px, calc(3px * var(--scale))) 0 var(--orange),
+        max(4px, calc(5px * var(--scale))) max(4px, calc(5px * var(--scale))) 0 var(--ink);
+      color: var(--white);
+      font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+      font-size: clamp(10px, calc(6px * var(--scale)), 20px);
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: transform 80ms ease, box-shadow 80ms ease, filter 120ms ease;
+    }
+
+    button:hover {
+      filter: brightness(1.08);
+      transform: translate(-1px, -1px);
+    }
+
+    button:active {
+      transform: translate(2px, 2px);
+      box-shadow:
+        max(1px, calc(1px * var(--scale))) max(1px, calc(1px * var(--scale))) 0 var(--orange),
+        max(2px, calc(2px * var(--scale))) max(2px, calc(2px * var(--scale))) 0 var(--ink);
+    }
+
+    .result-score {
+      margin: 0;
+      color: var(--cream);
+      font-family: "Courier New", monospace;
+      font-size: clamp(11px, calc(7px * var(--scale)), 22px);
+      font-weight: 800;
+      letter-spacing: 0.05em;
+    }
+
+    .result-note {
+      margin: 0;
+      color: var(--fog);
+      font-size: clamp(8px, calc(5px * var(--scale)), 16px);
+    }
+
+    .pause-title {
+      margin: 0;
+      font-family: "Courier New", monospace;
+      font-size: clamp(24px, calc(22px * var(--scale)), 76px);
+      font-weight: 900;
+      color: var(--yellow);
+      text-shadow: max(2px, calc(3px * var(--scale))) max(2px, calc(3px * var(--scale))) 0 var(--ink);
+    }
+
+    @media (max-width: 720px) {
+      #app {
+        padding: 4px;
+      }
+
+      .controls {
+        grid-template-columns: 1fr;
+        gap: 3px;
+      }
+
+      .subtitle {
+        display: none;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      button {
+        transition: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main id="app" aria-label="俯视角涂地对战游戏">
+    <div id="gameFrame">
+      <canvas id="gameCanvas" width="480" height="270" tabindex="0" aria-label="游戏画面"></canvas>
+
+      <section id="startOverlay" class="overlay" aria-labelledby="gameTitle">
+        <div class="panel">
+          <div class="eyebrow">90 second turf rush</div>
+          <h1 id="gameTitle">SPLAT//2D</h1>
+          <p class="subtitle">把场地涂成你的颜色，冲撞对手，抢下更多格子的控制权。</p>
+          <div class="team-row" aria-label="队伍颜色">
+            <span class="team-chip"><i class="swatch orange"></i>ORANGE / PLAYER</span>
+            <span class="team-chip"><i class="swatch blue"></i>BLUE / AI 1</span>
+            <span class="team-chip"><i class="swatch lime"></i>LIME / AI 2</span>
+          </div>
+          <div class="controls">
+            <div class="control-line"><kbd>WASD</kbd><span>移动，也可使用方向键</span></div>
+            <div class="control-line"><kbd>MOUSE</kbd><span>瞄准，不使用鼠标时朝移动方向</span></div>
+            <div class="control-line"><kbd>SPACE / LMB</kbd><span>短距离冲撞</span></div>
+            <div class="control-line"><kbd>E</kbd><span>使用拾取的道具</span></div>
+            <div class="control-line"><kbd>P / ESC</kbd><span>暂停或继续</span></div>
+            <div class="control-line"><kbd>ENTER</kbd><span>开始或重新开始</span></div>
+          </div>
+          <button id="startButton" type="button">开始涂地</button>
+        </div>
+      </section>
+
+      <section id="pauseOverlay" class="overlay hidden" aria-labelledby="pauseTitle">
+        <div class="panel">
+          <p class="eyebrow">turf control suspended</p>
+          <p id="pauseTitle" class="pause-title">PAUSED</p>
+          <button id="resumeButton" type="button">继续对战</button>
+        </div>
+      </section>
+
+      <section id="resultOverlay" class="overlay hidden" aria-labelledby="resultTitle">
+        <div class="panel">
+          <p class="eyebrow">final turf report</p>
+          <h2 id="resultTitle">橙队胜利</h2>
+          <p id="resultScore" class="result-score">ORANGE 0.0% / BLUE 0.0% / LIME 0.0%</p>
+          <p id="resultNote" class="result-note">未涂色区域不会计入任何队伍。</p>
+          <button id="restartButton" type="button">再战一场</button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      // ============================================================
+      // 1. CONFIG：所有可调参数集中在这里
+      // ============================================================
+      const CONFIG = {
+        // 对局与主循环
+        matchDuration: 90,          // 单局时长（秒）
+        fixedStep: 1 / 60,          // 固定逻辑步长；渲染仍由 requestAnimationFrame 驱动
+        maxFrameDelta: 0.1,         // 切回标签页时最多补算 0.1 秒，避免逻辑爆炸
+
+        // 低分辨率画布。内部始终为 480x270，再由 CSS 整数倍放大。
+        view: {
+          width: 480,
+          height: 270,
+          playOffsetY: 30
+        },
+
+        // 12 色限制色板。游戏内所有主色都从这里取。
+        palette: {
+          white: "#FFFFFF",
+          orange: "#FF7A00",
+          blue: "#3B82F6",
+          ink: "#3B82F6",
+          slate: "#3B82F6",
+          fog: "#FFFFFF",
+          cream: "#FFFFFF",
+          yellow: "#FF7A00",
+          red: "#FF7A00",
+          brown: "#3B82F6",
+          lime: "#86D46B",
+          ocean: "#3B82F6"
+        },
+
+        // 地图：30x15 个 16px tile，正好填满 HUD 下方的 480x240 战场。
+        map: {
+          cols: 30,
+          rows: 15,
+          tileSize: 16,
+          obstacleRects: [
+            { x: 2,  y: 5,  w: 2, h: 1 },
+            { x: 5,  y: 11, w: 2, h: 1 },
+            { x: 6,  y: 2,  w: 1, h: 4 },
+            { x: 7,  y: 2,  w: 3, h: 1 },
+            { x: 10, y: 7,  w: 5, h: 1 },
+            { x: 14, y: 5,  w: 1, h: 2 },
+            { x: 14, y: 11, w: 4, h: 1 },
+            { x: 17, y: 10, w: 1, h: 1 },
+            { x: 16, y: 3,  w: 2, h: 1 },
+            { x: 20, y: 9,  w: 1, h: 3 },
+            { x: 21, y: 2,  w: 2, h: 1 },
+            { x: 23, y: 2,  w: 1, h: 4 },
+            { x: 11, y: 12, w: 2, h: 1 }
+          ]
+        },
+
+        // 角色与冲撞
+        fighter: {
+          radius: 6,
+          moveSpeed: 58,              // 正常移动速度（px/秒）
+          enemyInkSlowEnabled: true,  // 是否启用“站在敌队墨水上减速”
+          enemyInkSpeedMultiplier: 0.7,
+          inkBrushRadius: 7.5,        // 只影响角色脚下附近的 tile
+          dashDistance: 48,           // 约 3 个身位
+          dashDuration: 0.2,
+          dashCooldown: 1.5,
+          stunDuration: 1.5,
+          mutualStunDuration: 0.8,    // 同帧对撞时双方短暂眩晕
+          knockbackDistance: 10,
+          dashFollowPaint: true       // 冲撞时也留下己方涂色轨迹
+        },
+
+        // AI 状态机
+        ai: {
+          count: 2,
+          decisionInterval: 0.24,
+          itemSeekRange: 128,
+          attackRange: 88,
+          dangerRange: 62,
+          fleeDuration: 1.15,
+          paintTargetMinDistance: 42,
+          paintTargetMaxDistance: 165,
+          recoverFleeDelay: 1.1
+        },
+
+        // 道具与刷新
+        items: {
+          crateSpawnInterval: 8,
+          maxCrates: 3,
+          initialCrates: 2,
+          publicCooldown: 1,
+          endgameBoostAt: 10,         // 最后 10 秒提高道具刷新频率
+          endgameSpawnInterval: 3.5,
+          pickupRadius: 9,
+          hammerRange: 36,
+          hammerHalfAngle: Math.PI / 3,
+          hammerStun: 1.2,
+          hammerEffectDuration: 0.22,
+          missileSpeed: 118,
+          missileTurnSpeed: 5.2,
+          missileLifetime: 2.7,
+          missileAoeRadius: 22,
+          missileStun: 1.5,
+          trapArmTime: 0.3,
+          trapRootDuration: 2,
+          trapLifetime: 15,
+          trapTriggerRadius: 8,
+          dropItemOnStun: true,
+          droppedCratePickupDelay: 1
+        },
+
+        // 特效和表现
+        effects: {
+          dashShake: 0,
+          hitShake: 2.6,
+          hitShakeDuration: 0.16,
+          missileShake: 3.2,
+          missileShakeDuration: 0.2,
+          trailInterval: 0.025
+        }
+      };
+
+      // ============================================================
+      // 2. 工具函数
+      // ============================================================
+      const P = CONFIG.palette;
+      const TILE = CONFIG.map.tileSize;
+      const MAP_W = CONFIG.map.cols * TILE;
+      const MAP_H = CONFIG.map.rows * TILE;
+
+      const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+      const lerp = (a, b, t) => a + (b - a) * t;
+      const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+      const randomRange = (min, max) => min + Math.random() * (max - min);
+      const randomInt = (min, max) => Math.floor(randomRange(min, max + 1));
+
+      function normalize(x, y) {
+        const length = Math.hypot(x, y);
+        if (length < 0.00001) return { x: 0, y: 0, length: 0 };
+        return { x: x / length, y: y / length, length };
+      }
+
+      function angleDifference(a, b) {
+        let difference = a - b;
+        while (difference > Math.PI) difference -= Math.PI * 2;
+        while (difference < -Math.PI) difference += Math.PI * 2;
+        return difference;
+      }
+
+      function turnToward(current, target, maxStep) {
+        const difference = angleDifference(target, current);
+        return current + clamp(difference, -maxStep, maxStep);
+      }
+
+      function formatTime(seconds) {
+        const safe = Math.max(0, Math.ceil(seconds));
+        const minutes = Math.floor(safe / 60);
+        const remainder = safe % 60;
+        return `${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
+      }
+
+      function teamColor(team) {
+        if (team === 1) return P.orange;
+        if (team === 2) return P.blue;
+        return P.lime;
+      }
+
+      function formatInteger(value, width) {
+        return String(Math.round(value)).padStart(width, "0");
+      }
+
+      // ============================================================
+      // 3. Input：键盘、鼠标输入与逻辑帧边界
+      // ============================================================
+      class InputManager {
+        constructor(canvas) {
+          this.canvas = canvas;
+          this.keys = new Set();
+          this.pressedThisFrame = new Set();
+          this.mouse = {
+            x: CONFIG.view.width / 2,
+            y: (CONFIG.view.playOffsetY + MAP_H) / 2,
+            inside: false,
+            down: false
+          };
+          this.mousePressedThisFrame = false;
+          this.bind();
+        }
+
+        bind() {
+          const controlledKeys = new Set([
+            "Space", "KeyW", "KeyA", "KeyS", "KeyD", "KeyE",
+            "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
+            "KeyP", "Escape", "Enter"
+          ]);
+
+          window.addEventListener("keydown", (event) => {
+            if (controlledKeys.has(event.code)) event.preventDefault();
+            if (!this.keys.has(event.code)) this.pressedThisFrame.add(event.code);
+            this.keys.add(event.code);
+          });
+
+          window.addEventListener("keyup", (event) => {
+            this.keys.delete(event.code);
+          });
+
+          window.addEventListener("blur", () => {
+            this.keys.clear();
+            this.mouse.down = false;
+            this.mouse.inside = false;
+          });
+
+          this.canvas.addEventListener("pointermove", (event) => {
+            this.updateMousePosition(event);
+          });
+
+          this.canvas.addEventListener("pointerenter", (event) => {
+            this.mouse.inside = true;
+            this.updateMousePosition(event);
+          });
+
+          this.canvas.addEventListener("pointerleave", () => {
+            this.mouse.inside = false;
+          });
+
+          this.canvas.addEventListener("pointerdown", (event) => {
+            if (event.button !== 0) return;
+            event.preventDefault();
+            this.canvas.focus({ preventScroll: true });
+            this.updateMousePosition(event);
+            this.mouse.down = true;
+            this.mousePressedThisFrame = true;
+          });
+
+          window.addEventListener("pointerup", (event) => {
+            if (event.button === 0) this.mouse.down = false;
+          });
+
+          this.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+        }
+
+        updateMousePosition(event) {
+          const rect = this.canvas.getBoundingClientRect();
+          if (rect.width <= 0 || rect.height <= 0) return;
+          this.mouse.x = clamp(((event.clientX - rect.left) / rect.width) * CONFIG.view.width, 0, CONFIG.view.width);
+          this.mouse.y = clamp(((event.clientY - rect.top) / rect.height) * CONFIG.view.height, 0, CONFIG.view.height);
+          this.mouse.inside =
+            this.mouse.x >= 0 &&
+            this.mouse.x <= CONFIG.view.width &&
+            this.mouse.y >= CONFIG.view.playOffsetY &&
+            this.mouse.y <= CONFIG.view.playOffsetY + MAP_H;
+        }
+
+        isDown(...codes) {
+          return codes.some((code) => this.keys.has(code));
+        }
+
+        wasPressed(...codes) {
+          return codes.some((code) => this.pressedThisFrame.has(code));
+        }
+
+        getMovement() {
+          const right = this.isDown("KeyD", "ArrowRight") ? 1 : 0;
+          const left = this.isDown("KeyA", "ArrowLeft") ? 1 : 0;
+          const down = this.isDown("KeyS", "ArrowDown") ? 1 : 0;
+          const up = this.isDown("KeyW", "ArrowUp") ? 1 : 0;
+          return normalize(right - left, down - up);
+        }
+
+        // 方向键本身也参与瞄准；按住 WASD 时可用方向键单独改变朝向。
+        getArrowAim() {
+          const right = this.isDown("ArrowRight") ? 1 : 0;
+          const left = this.isDown("ArrowLeft") ? 1 : 0;
+          const down = this.isDown("ArrowDown") ? 1 : 0;
+          const up = this.isDown("ArrowUp") ? 1 : 0;
+          return normalize(right - left, down - up);
+        }
+
+        endLogicFrame() {
+          this.pressedThisFrame.clear();
+          this.mousePressedThisFrame = false;
+        }
+      }
+
+      // ============================================================
+      // 4. Map & Ink：tile 数据 + 离屏 Canvas 缓存
+      // ============================================================
+      class InkMap {
+        constructor() {
+          this.cols = CONFIG.map.cols;
+          this.rows = CONFIG.map.rows;
+          this.tileSize = TILE;
+          this.width = this.cols * this.tileSize;
+          this.height = this.rows * this.tileSize;
+          this.ink = new Uint8Array(this.cols * this.rows); // 0 白 / 1 橙 / 2 蓝
+          this.solid = new Uint8Array(this.cols * this.rows);
+          this.paintableCount = this.cols * this.rows;
+          this.obstacleRects = CONFIG.map.obstacleRects.map((rect) => ({ ...rect }));
+
+          this.cache = document.createElement("canvas");
+          this.cache.width = this.width;
+          this.cache.height = this.height;
+          this.cacheCtx = this.cache.getContext("2d", { alpha: false });
+          this.cacheCtx.imageSmoothingEnabled = false;
+          this.cacheCtx.fillStyle = P.white;
+          this.cacheCtx.fillRect(0, 0, this.width, this.height);
+
+          this.applyObstacles();
+          this.recalculatePaintableCount();
+        }
+
+        applyObstacles() {
+          for (const rect of this.obstacleRects) {
+            for (let y = rect.y; y < rect.y + rect.h; y++) {
+              for (let x = rect.x; x < rect.x + rect.w; x++) {
+                if (this.inBounds(x, y)) this.solid[this.index(x, y)] = 1;
+              }
+            }
+          }
+        }
+
+        recalculatePaintableCount() {
+          let count = 0;
+          for (let i = 0; i < this.solid.length; i++) {
+            if (this.solid[i] === 0) count++;
+          }
+          this.paintableCount = Math.max(1, count);
+        }
+
+        index(cx, cy) {
+          return cy * this.cols + cx;
+        }
+
+        inBounds(cx, cy) {
+          return cx >= 0 && cy >= 0 && cx < this.cols && cy < this.rows;
+        }
+
+        getCell(cx, cy) {
+          if (!this.inBounds(cx, cy)) return 2;
+          return this.ink[this.index(cx, cy)];
+        }
+
+        isSolidTile(cx, cy) {
+          if (!this.inBounds(cx, cy)) return true;
+          return this.solid[this.index(cx, cy)] === 1;
+        }
+
+        isSolidAt(x, y) {
+          if (x < 0 || y < 0 || x >= this.width || y >= this.height) return true;
+          return this.isSolidTile(Math.floor(x / TILE), Math.floor(y / TILE));
+        }
+
+        canOccupy(x, y, radius) {
+          const sampleRadius = radius * 0.72;
+          if (
+            x - radius < 0 ||
+            y - radius < 0 ||
+            x + radius > this.width ||
+            y + radius > this.height
+          ) {
+            return false;
+          }
+          for (let i = 0; i < 8; i++) {
+            const angle = (Math.PI * 2 * i) / 8;
+            if (this.isSolidAt(x + Math.cos(angle) * sampleRadius, y + Math.sin(angle) * sampleRadius)) {
+              return false;
+            }
+          }
+          return !this.isSolidAt(x, y);
+        }
+
+        moveEntity(entity, dx, dy) {
+          const length = Math.hypot(dx, dy);
+          if (length < 0.00001) return 0;
+          const steps = Math.max(1, Math.ceil(length / 2));
+          const stepX = dx / steps;
+          const stepY = dy / steps;
+          let moved = 0;
+
+          for (let i = 0; i < steps; i++) {
+            if (this.canOccupy(entity.x + stepX, entity.y, entity.radius)) {
+              entity.x += stepX;
+              moved += Math.abs(stepX);
+            }
+            if (this.canOccupy(entity.x, entity.y + stepY, entity.radius)) {
+              entity.y += stepY;
+              moved += Math.abs(stepY);
+            }
+          }
+          return moved;
+        }
+
+        /**
+         * 只更新与 brush 半径相交的 tile；每个 tile 只在颜色变化时重绘到离屏画布。
+         * 这是涂色性能的核心：不保存逐像素位图，不做每帧全场地重绘。
+         */
+        paintBrush(x, y, radius, team) {
+          if (team < 1 || team > 3) return 0;
+          const centerX = Math.floor(x / TILE);
+          const centerY = Math.floor(y / TILE);
+          const range = Math.ceil(radius / TILE);
+          let changed = 0;
+
+          for (let cy = centerY - range; cy <= centerY + range; cy++) {
+            for (let cx = centerX - range; cx <= centerX + range; cx++) {
+              if (!this.inBounds(cx, cy) || this.isSolidTile(cx, cy)) continue;
+              const tileCenterX = cx * TILE + TILE / 2;
+              const tileCenterY = cy * TILE + TILE / 2;
+              const insideBrush =
+                Math.hypot(tileCenterX - x, tileCenterY - y) <= radius + TILE * 0.38 ||
+                (cx === centerX && cy === centerY);
+              if (!insideBrush) continue;
+
+              const index = this.index(cx, cy);
+              if (this.ink[index] === team) continue;
+              this.ink[index] = team;
+              this.cacheCtx.fillStyle = teamColor(team);
+              this.cacheCtx.fillRect(cx * TILE, cy * TILE, TILE, TILE);
+              changed++;
+            }
+          }
+          return changed;
+        }
+
+        coverage() {
+          let orange = 0;
+          let blue = 0;
+          let lime = 0;
+          for (let i = 0; i < this.ink.length; i++) {
+            if (this.solid[i]) continue;
+            if (this.ink[i] === 1) orange++;
+            if (this.ink[i] === 2) blue++;
+            if (this.ink[i] === 3) lime++;
+          }
+          const orangePercent = (orange / this.paintableCount) * 100;
+          const bluePercent = (blue / this.paintableCount) * 100;
+          const limePercent = (lime / this.paintableCount) * 100;
+          return {
+            orange,
+            blue,
+            lime,
+            neutral: this.paintableCount - orange - blue - lime,
+            orangePercent,
+            bluePercent,
+            limePercent
+          };
+        }
+
+        hasLineOfSight(x1, y1, x2, y2) {
+          const distanceToTarget = Math.hypot(x2 - x1, y2 - y1);
+          const steps = Math.max(1, Math.ceil(distanceToTarget / 4));
+          for (let i = 1; i < steps; i++) {
+            const t = i / steps;
+            if (this.isSolidAt(lerp(x1, x2, t), lerp(y1, y2, t))) return false;
+          }
+          return true;
+        }
+
+        cellCenter(cx, cy) {
+          return {
+            x: cx * TILE + TILE / 2,
+            y: cy * TILE + TILE / 2
+          };
+        }
+
+        worldToCell(x, y) {
+          return {
+            x: clamp(Math.floor(x / TILE), 0, this.cols - 1),
+            y: clamp(Math.floor(y / TILE), 0, this.rows - 1)
+          };
+        }
+
+        findPath(startX, startY, targetX, targetY) {
+          const start = this.worldToCell(startX, startY);
+          const target = this.worldToCell(targetX, targetY);
+          if (this.isSolidTile(target.x, target.y)) return [];
+          if (start.x === target.x && start.y === target.y) return [this.cellCenter(target.x, target.y)];
+
+          const total = this.cols * this.rows;
+          const queue = new Int32Array(total);
+          const visited = new Uint8Array(total);
+          const previous = new Int32Array(total);
+          previous.fill(-1);
+          let head = 0;
+          let tail = 0;
+          const startIndex = this.index(start.x, start.y);
+          const targetIndex = this.index(target.x, target.y);
+          queue[tail++] = startIndex;
+          visited[startIndex] = 1;
+          const directions = [
+            [1, 0], [-1, 0], [0, 1], [0, -1]
+          ];
+          let found = false;
+
+          while (head < tail) {
+            const current = queue[head++];
+            if (current === targetIndex) {
+              found = true;
+              break;
+            }
+            const cx = current % this.cols;
+            const cy = Math.floor(current / this.cols);
+            for (const [dx, dy] of directions) {
+              const nx = cx + dx;
+              const ny = cy + dy;
+              if (!this.inBounds(nx, ny) || this.isSolidTile(nx, ny)) continue;
+              const next = this.index(nx, ny);
+              if (visited[next]) continue;
+              visited[next] = 1;
+              previous[next] = current;
+              queue[tail++] = next;
+            }
+          }
+
+          if (!found) return [];
+          const path = [];
+          let current = targetIndex;
+          while (current !== startIndex && current >= 0) {
+            const cx = current % this.cols;
+            const cy = Math.floor(current / this.cols);
+            path.push(this.cellCenter(cx, cy));
+            current = previous[current];
+          }
+          path.reverse();
+          return path;
+        }
+
+        randomOpenCell(minDistanceFrom = []) {
+          for (let attempt = 0; attempt < 120; attempt++) {
+            const cx = randomInt(0, this.cols - 1);
+            const cy = randomInt(0, this.rows - 1);
+            if (this.isSolidTile(cx, cy)) continue;
+            const center = this.cellCenter(cx, cy);
+            const tooClose = minDistanceFrom.some((point) => {
+              return Math.hypot(center.x - point.x, center.y - point.y) < point.min;
+            });
+            if (!tooClose) return { cx, cy, ...center };
+          }
+          return null;
+        }
+
+        choosePaintTarget(team, x, y) {
+          let best = null;
+          let bestScore = -Infinity;
+          const currentCell = this.worldToCell(x, y);
+
+          // 随机采样足够多的格子，偏向敌队墨水和稍远的路线，避免 AI 原地抖动。
+          for (let attempt = 0; attempt < 120; attempt++) {
+            const cx = randomInt(0, this.cols - 1);
+            const cy = randomInt(0, this.rows - 1);
+            if (this.isSolidTile(cx, cy)) continue;
+            const index = this.index(cx, cy);
+            if (this.ink[index] === team) continue;
+            const center = this.cellCenter(cx, cy);
+            const dist = Math.hypot(center.x - x, center.y - y);
+            if (dist < CONFIG.ai.paintTargetMinDistance) continue;
+
+            let score = -Math.abs(dist - 92);
+            if (dist > CONFIG.ai.paintTargetMaxDistance) {
+              score -= (dist - CONFIG.ai.paintTargetMaxDistance) * 2.2;
+            }
+            // 三方对局先扩张中立区域；等空白减少后自然转入地盘争夺。
+            if (this.ink[index] === 0) score += 32;
+            else if (this.ink[index] !== team) score -= 8;
+            if (Math.abs(cx - currentCell.x) + Math.abs(cy - currentCell.y) < 2) score -= 46;
+            score += Math.random() * 28;
+            if (score > bestScore) {
+              bestScore = score;
+              best = { cx, cy, ...center };
+            }
+          }
+          return best || this.randomOpenCell();
+        }
+
+        chooseFleeTarget(x, y, threatX, threatY) {
+          let best = null;
+          let bestScore = -Infinity;
+          for (let attempt = 0; attempt < 100; attempt++) {
+            const cx = randomInt(0, this.cols - 1);
+            const cy = randomInt(0, this.rows - 1);
+            if (this.isSolidTile(cx, cy)) continue;
+            const center = this.cellCenter(cx, cy);
+            const threatDistance = Math.hypot(center.x - threatX, center.y - threatY);
+            const selfDistance = Math.hypot(center.x - x, center.y - y);
+            const score = threatDistance * 2.4 - selfDistance * 0.3 + Math.random() * 32;
+            if (score > bestScore) {
+              bestScore = score;
+              best = { cx, cy, ...center };
+            }
+          }
+          return best || this.randomOpenCell();
+        }
+
+        nearestOpenCell(x, y) {
+          const cell = this.worldToCell(x, y);
+          if (!this.isSolidTile(cell.x, cell.y)) return { ...cell, ...this.cellCenter(cell.x, cell.y) };
+          for (let radius = 1; radius < 8; radius++) {
+            for (let oy = -radius; oy <= radius; oy++) {
+              for (let ox = -radius; ox <= radius; ox++) {
+                if (Math.abs(ox) !== radius && Math.abs(oy) !== radius) continue;
+                const nx = cell.x + ox;
+                const ny = cell.y + oy;
+                if (this.inBounds(nx, ny) && !this.isSolidTile(nx, ny)) {
+                  return { x: nx, y: ny, ...this.cellCenter(nx, ny) };
+                }
+              }
+            }
+          }
+          return null;
+        }
+      }
+
+      // ============================================================
+      // 5. Effects：粒子、冲击、震屏与短时提示
+      // ============================================================
+      class Effects {
+        constructor(game) {
+          this.game = game;
+          this.particles = [];
+          this.floatingTexts = [];
+          this.hammerSwings = [];
+          this.dashGhosts = [];
+          this.explosions = [];
+          this.shakeTime = 0;
+          this.shakeDuration = 0;
+          this.shakePower = 0;
+        }
+
+        spawnInkBurst(x, y, color, count = 5, power = 36) {
+          for (let i = 0; i < count; i++) {
+            const angle = randomRange(0, Math.PI * 2);
+            const speed = randomRange(power * 0.3, power);
+            this.particles.push({
+              x,
+              y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              life: randomRange(0.18, 0.38),
+              maxLife: 0.38,
+              size: randomInt(1, 3),
+              color
+            });
+          }
+        }
+
+        spawnHit(x, y, color) {
+          this.spawnInkBurst(x, y, color, 10, 72);
+          this.spawnInkBurst(x, y, P.yellow, 4, 48);
+          this.floatingTexts.push({
+            text: "STUN!",
+            x,
+            y: y - 14,
+            life: 0.55,
+            maxLife: 0.55,
+            color: P.yellow
+          });
+        }
+
+        spawnDashGhost(fighter) {
+          this.dashGhosts.push({
+            x: fighter.x,
+            y: fighter.y,
+            angle: fighter.aimAngle,
+            team: fighter.team,
+            life: 0.14,
+            maxLife: 0.14
+          });
+        }
+
+        spawnHammer(x, y, angle, team) {
+          this.hammerSwings.push({
+            x,
+            y,
+            angle,
+            team,
+            life: CONFIG.items.hammerEffectDuration,
+            maxLife: CONFIG.items.hammerEffectDuration
+          });
+        }
+
+        spawnExplosion(x, y, team) {
+          this.explosions.push({
+            x,
+            y,
+            team,
+            life: 0.28,
+            maxLife: 0.28
+          });
+          this.spawnInkBurst(x, y, teamColor(team), 18, 110);
+          this.spawnInkBurst(x, y, P.cream, 8, 80);
+        }
+
+        shake(power, duration) {
+          if (power < this.shakePower && this.shakeTime > 0) return;
+          this.shakePower = Math.max(this.shakePower, power);
+          this.shakeDuration = Math.max(duration, this.shakeTime);
+          this.shakeTime = Math.max(this.shakeTime, duration);
+        }
+
+        update(dt) {
+          for (const particle of this.particles) {
+            particle.life -= dt;
+            particle.x += particle.vx * dt;
+            particle.y += particle.vy * dt;
+            particle.vx *= Math.pow(0.03, dt);
+            particle.vy *= Math.pow(0.03, dt);
+          }
+          this.particles = this.particles.filter((particle) => particle.life > 0);
+
+          for (const text of this.floatingTexts) {
+            text.life -= dt;
+            text.y -= 12 * dt;
+          }
+          this.floatingTexts = this.floatingTexts.filter((text) => text.life > 0);
+
+          for (const swing of this.hammerSwings) swing.life -= dt;
+          this.hammerSwings = this.hammerSwings.filter((swing) => swing.life > 0);
+
+          for (const ghost of this.dashGhosts) ghost.life -= dt;
+          this.dashGhosts = this.dashGhosts.filter((ghost) => ghost.life > 0);
+
+          for (const explosion of this.explosions) explosion.life -= dt;
+          this.explosions = this.explosions.filter((explosion) => explosion.life > 0);
+
+          if (this.shakeTime > 0) {
+            this.shakeTime = Math.max(0, this.shakeTime - dt);
+            if (this.shakeTime === 0) {
+              this.shakePower = 0;
+              this.shakeDuration = 0;
+            }
+          }
+
+          if (this.game.noticeTime > 0) this.game.noticeTime = Math.max(0, this.game.noticeTime - dt);
+        }
+
+        getShakeOffset(time) {
+          if (this.shakeTime <= 0 || this.shakePower <= 0) return { x: 0, y: 0 };
+          const ratio = this.shakeDuration > 0 ? this.shakeTime / this.shakeDuration : 0;
+          const power = this.shakePower * ratio;
+          return {
+            x: Math.round(Math.sin(time * 83.17) * power),
+            y: Math.round(Math.cos(time * 67.43) * power * 0.72)
+          };
+        }
+      }
+
+      // ============================================================
+      // 6. Fighter：玩家和 AI 共用的角色物理、状态与冲撞
+      // ============================================================
+      class Fighter {
+        constructor(game, options) {
+          this.game = game;
+          this.id = options.id;
+          this.team = options.team;
+          this.isAI = Boolean(options.isAI);
+          this.name = options.name || "INKLING";
+          this.spawnX = options.x;
+          this.spawnY = options.y;
+          this.x = options.x;
+          this.y = options.y;
+          this.radius = CONFIG.fighter.radius;
+          this.aimAngle = options.aimAngle ?? 0;
+          this.moveX = 0;
+          this.moveY = 0;
+          this.moveTime = 0;
+          this.idleTime = Math.random() * 2;
+          this.isMoving = false;
+          this.dashTime = 0;
+          this.dashCooldown = 0;
+          this.dashAngle = this.aimAngle;
+          this.dashStartFrame = -999;
+          this.dashStartedAt = -999;
+          this.dashHitIds = new Set();
+          this.dashTrailTimer = 0;
+          this.status = {
+            type: null, // null / stun / root
+            time: 0,
+            duration: 0
+          };
+          this.recoverFleeTime = 0;
+          this.inventory = null;
+          this.itemCooldown = 0;
+          this.lastHitBy = null;
+          this.lastPaintCount = 0;
+        }
+
+        get isStunned() {
+          return this.status.type === "stun" && this.status.time > 0;
+        }
+
+        get isRooted() {
+          return this.status.type === "root" && this.status.time > 0;
+        }
+
+        get isDashing() {
+          return this.dashTime > 0;
+        }
+
+        get dashSpeed() {
+          return CONFIG.fighter.dashDistance / CONFIG.fighter.dashDuration;
+        }
+
+        get currentCellTeam() {
+          const cell = this.game.map.worldToCell(this.x, this.y);
+          return this.game.map.getCell(cell.x, cell.y);
+        }
+
+        update(dt, controls) {
+          this.dashCooldown = Math.max(0, this.dashCooldown - dt);
+          this.itemCooldown = Math.max(0, this.itemCooldown - dt);
+          this.recoverFleeTime = Math.max(0, this.recoverFleeTime - dt);
+          this.updateStatus(dt);
+          this.idleTime += dt;
+
+          if (this.isStunned) {
+            this.isMoving = false;
+            return;
+          }
+
+          if (controls.itemUse) {
+            this.tryUseItem();
+          }
+
+          if (this.isDashing) {
+            this.updateDash(dt);
+            return;
+          }
+
+          const move = normalize(controls.moveX, controls.moveY);
+          this.moveX = move.x;
+          this.moveY = move.y;
+          this.isMoving = move.length > 0.01 && !this.isRooted;
+
+          if (Number.isFinite(controls.aimAngle)) {
+            this.aimAngle = controls.aimAngle;
+          } else if (this.isMoving) {
+            this.aimAngle = Math.atan2(move.y, move.x);
+          }
+
+          if (!this.isRooted && controls.dash) {
+            this.tryStartDash();
+          }
+
+          if (this.isDashing) {
+            this.updateDash(dt);
+            return;
+          }
+
+          if (this.isMoving && !this.isRooted) {
+            let speed = CONFIG.fighter.moveSpeed;
+            if (
+              CONFIG.fighter.enemyInkSlowEnabled &&
+              this.currentCellTeam !== 0 &&
+              this.currentCellTeam !== this.team
+            ) {
+              speed *= CONFIG.fighter.enemyInkSpeedMultiplier;
+            }
+            this.game.map.moveEntity(this, move.x * speed * dt, move.y * speed * dt);
+            this.moveTime += dt;
+          }
+
+          // 每一逻辑帧只处理角色脚下附近的几个格子。
+          this.paintFeet();
+        }
+
+        updateStatus(dt) {
+          if (this.status.time <= 0) return;
+          const wasStun = this.status.type === "stun";
+          this.status.time = Math.max(0, this.status.time - dt);
+          if (this.status.time > 0) return;
+
+          const previousType = this.status.type;
+          this.status.type = null;
+          this.status.duration = 0;
+          if (previousType === "stun" || wasStun) {
+            this.recoverFleeTime = CONFIG.ai.recoverFleeDelay;
+            this.game.onFighterRecovered(this);
+          }
+        }
+
+        tryStartDash() {
+          if (
+            this.dashCooldown > 0 ||
+            this.isDashing ||
+            this.isStunned ||
+            this.isRooted
+          ) {
+            return false;
+          }
+
+          this.dashTime = CONFIG.fighter.dashDuration;
+          this.dashCooldown = CONFIG.fighter.dashCooldown;
+          this.dashAngle = this.aimAngle;
+          this.dashStartFrame = this.game.frame;
+          this.dashStartedAt = this.game.elapsed;
+          this.dashHitIds.clear();
+          this.dashTrailTimer = 0;
+          this.moveTime += 0.02;
+          this.game.onDashStarted(this);
+          return true;
+        }
+
+        updateDash(dt) {
+          const remaining = Math.min(dt, this.dashTime);
+          const moveDistance = this.dashSpeed * remaining;
+          const beforeX = this.x;
+          const beforeY = this.y;
+          this.game.map.moveEntity(
+            this,
+            Math.cos(this.dashAngle) * moveDistance,
+            Math.sin(this.dashAngle) * moveDistance
+          );
+
+          this.dashTime = Math.max(0, this.dashTime - dt);
+          this.isMoving = true;
+          this.moveTime += dt;
+
+          if (CONFIG.fighter.dashFollowPaint) this.paintFeet();
+
+          this.dashTrailTimer -= dt;
+          if (this.dashTrailTimer <= 0) {
+            this.dashTrailTimer = CONFIG.effects.trailInterval;
+            if (Math.abs(this.x - beforeX) + Math.abs(this.y - beforeY) > 0.15) {
+              this.game.effects.spawnDashGhost(this);
+            }
+          }
+
+          if (this.dashTime <= 0) this.cancelDash();
+        }
+
+        cancelDash() {
+          this.dashTime = 0;
+        }
+
+        paintFeet() {
+          if (this.game.map.isSolidAt(this.x, this.y)) return;
+          this.lastPaintCount = this.game.map.paintBrush(
+            this.x,
+            this.y,
+            CONFIG.fighter.inkBrushRadius,
+            this.team
+          );
+        }
+
+        tryUseItem() {
+          if (!this.inventory || this.isStunned || this.itemCooldown > 0) return false;
+          return this.game.items.use(this, this.inventory.type);
+        }
+
+        applyStun(duration, source, options = {}) {
+          // 眩晕期间再次受到控制不生效，防止被连续锁定。
+          if (this.isStunned) return false;
+
+          this.cancelDash();
+          this.status = {
+            type: "stun",
+            time: duration,
+            duration
+          };
+          this.lastHitBy = source ? source.id : null;
+
+          // 可选的反制规则：眩晕时掉出已持有道具。
+          if (options.dropItem && this.inventory) {
+            this.game.items.dropInventory(this, this.x, this.y);
+          }
+
+          return true;
+        }
+
+        applyRoot(duration, source) {
+          if (this.isStunned) return false;
+          this.cancelDash();
+          if (this.status.type === "root") {
+            this.status.time = Math.max(this.status.time, duration);
+            this.status.duration = Math.max(this.status.duration, duration);
+            return true;
+          }
+          this.status = {
+            type: "root",
+            time: duration,
+            duration
+          };
+          this.lastHitBy = source ? source.id : null;
+          return true;
+        }
+
+        knockAway(fromX, fromY, amount) {
+          const away = normalize(this.x - fromX, this.y - fromY);
+          if (away.length < 0.001) return;
+          this.game.map.moveEntity(this, away.x * amount, away.y * amount);
+        }
+      }
+
+      // ============================================================
+      // 7. Items：道具箱、锤子、追踪导弹与陷阱
+      // ============================================================
+      class ItemSystem {
+        constructor(game) {
+          this.game = game;
+          this.crates = [];
+          this.projectiles = [];
+          this.traps = [];
+          this.nextId = 1;
+          this.spawnTimer = CONFIG.items.crateSpawnInterval;
+
+          for (let i = 0; i < CONFIG.items.initialCrates; i++) {
+            this.spawnCrate();
+          }
+        }
+
+        currentSpawnInterval() {
+          if (this.game.matchTime <= CONFIG.items.endgameBoostAt) {
+            return CONFIG.items.endgameSpawnInterval;
+          }
+          return CONFIG.items.crateSpawnInterval;
+        }
+
+        randomItemType() {
+          const types = ["hammer", "missile", "trap"];
+          return types[randomInt(0, types.length - 1)];
+        }
+
+        spawnCrate(type = null, position = null, options = {}) {
+          if (!options.dropped && this.crates.length >= CONFIG.items.maxCrates) return null;
+
+          let point = position;
+          if (!point) {
+            const exclusions = [];
+            for (const fighter of this.game.fighters) {
+              exclusions.push({ x: fighter.x, y: fighter.y, min: 30 });
+            }
+            for (const crate of this.crates) {
+              exclusions.push({ x: crate.x, y: crate.y, min: 28 });
+            }
+            for (const trap of this.traps) {
+              exclusions.push({ x: trap.x, y: trap.y, min: 24 });
+            }
+            point = this.game.map.randomOpenCell(exclusions);
+          }
+
+          if (!point) {
+            point = this.game.map.nearestOpenCell(
+              randomRange(TILE, MAP_W - TILE),
+              randomRange(TILE, MAP_H - TILE)
+            );
+          }
+          if (!point) return null;
+
+          const crate = {
+            id: this.nextId++,
+            x: point.x,
+            y: point.y,
+            type: type || this.randomItemType(),
+            age: 0,
+            bobSeed: Math.random() * Math.PI * 2,
+            pickupDelay: options.dropped ? CONFIG.items.droppedCratePickupDelay : 0.2,
+            dropped: Boolean(options.dropped),
+            dead: false
+          };
+          this.crates.push(crate);
+          return crate;
+        }
+
+        dropInventory(fighter, x, y) {
+          if (!fighter.inventory || !CONFIG.items.dropItemOnStun) return;
+          const type = fighter.inventory.type;
+          fighter.inventory = null;
+          const point = this.game.map.nearestOpenCell(x, y);
+          if (!point) return;
+          this.spawnCrate(type, point, { dropped: true });
+        }
+
+        getNearestCrate(x, y, maxDistance = Infinity) {
+          let nearest = null;
+          let nearestDistance = maxDistance;
+          for (const crate of this.crates) {
+            if (crate.dead) continue;
+            const dist = Math.hypot(crate.x - x, crate.y - y);
+            if (dist < nearestDistance) {
+              nearest = crate;
+              nearestDistance = dist;
+            }
+          }
+          return nearest;
+        }
+
+        update(dt) {
+          this.spawnTimer -= dt;
+          if (this.spawnTimer <= 0) {
+            if (this.crates.length < CONFIG.items.maxCrates) this.spawnCrate();
+            this.spawnTimer = this.currentSpawnInterval();
+          }
+
+          // 道具箱拾取：只有空手角色能捡起，保证同时最多持有 1 个道具。
+          for (const crate of this.crates) {
+            crate.age += dt;
+            crate.pickupDelay = Math.max(0, crate.pickupDelay - dt);
+            if (crate.dead || crate.pickupDelay > 0) continue;
+
+            let picker = null;
+            let bestDistance = CONFIG.items.pickupRadius;
+            for (const fighter of this.game.fighters) {
+              if (fighter.inventory || fighter.isStunned) continue;
+              const dist = Math.hypot(fighter.x - crate.x, fighter.y - crate.y);
+              if (dist <= bestDistance) {
+                bestDistance = dist;
+                picker = fighter;
+              }
+            }
+
+            if (picker) {
+              crate.dead = true;
+              picker.inventory = { type: crate.type };
+              this.game.notify(`PICKED UP: ${this.itemName(crate.type)}`);
+              this.game.effects.spawnInkBurst(crate.x, crate.y, P.yellow, 7, 42);
+            }
+          }
+          this.crates = this.crates.filter((crate) => !crate.dead);
+
+          // 陷阱：先展开，再检测敌队。己队踩上去不会触发。
+          for (const trap of this.traps) {
+            trap.life -= dt;
+            trap.armTime = Math.max(0, trap.armTime - dt);
+            if (trap.life <= 0 || trap.dead) continue;
+            if (trap.armTime > 0) continue;
+
+            for (const fighter of this.game.fighters) {
+              if (fighter.team === trap.team) continue;
+              if (Math.hypot(fighter.x - trap.x, fighter.y - trap.y) > CONFIG.items.trapTriggerRadius) continue;
+
+              const applied = fighter.applyRoot(CONFIG.items.trapRootDuration, trap.source);
+              if (!applied) continue;
+              trap.dead = true;
+              fighter.cancelDash();
+              this.game.effects.spawnInkBurst(trap.x, trap.y, P.yellow, 12, 72);
+              this.game.effects.floatingTexts.push({
+                text: "ROOTED!",
+                x: fighter.x,
+                y: fighter.y - 16,
+                life: 0.65,
+                maxLife: 0.65,
+                color: P.yellow
+              });
+              this.game.notify("TRAP TRIGGERED");
+              this.game.effects.shake(1.2, 0.09);
+              break;
+            }
+          }
+          this.traps = this.traps.filter((trap) => !trap.dead && trap.life > 0);
+
+          this.updateProjectiles(dt);
+        }
+
+        updateProjectiles(dt) {
+          for (const projectile of this.projectiles) {
+            if (projectile.dead) continue;
+            projectile.life -= dt;
+            if (projectile.life <= 0) {
+              this.explodeMissile(projectile);
+              continue;
+            }
+
+            // 追踪“当前最近敌人”而不是锁定发射瞬间的目标，保留走位躲避空间。
+            const target = this.game.getNearestEnemy(projectile.team, projectile.x, projectile.y);
+            if (target) {
+              const desiredAngle = Math.atan2(target.y - projectile.y, target.x - projectile.x);
+              projectile.angle = turnToward(
+                projectile.angle,
+                desiredAngle,
+                CONFIG.items.missileTurnSpeed * dt
+              );
+            }
+
+            projectile.x += Math.cos(projectile.angle) * CONFIG.items.missileSpeed * dt;
+            projectile.y += Math.sin(projectile.angle) * CONFIG.items.missileSpeed * dt;
+
+            if (this.game.map.isSolidAt(projectile.x, projectile.y)) {
+              this.explodeMissile(projectile);
+              continue;
+            }
+
+            for (const fighter of this.game.fighters) {
+              if (fighter.team === projectile.team) continue;
+              if (Math.hypot(fighter.x - projectile.x, fighter.y - projectile.y) <= fighter.radius + 4) {
+                this.explodeMissile(projectile);
+                break;
+              }
+            }
+          }
+          this.projectiles = this.projectiles.filter((projectile) => !projectile.dead);
+        }
+
+        explodeMissile(projectile) {
+          if (projectile.dead) return;
+          projectile.dead = true;
+          const source = this.game.fighters.find((fighter) => fighter.id === projectile.ownerId) || null;
+          this.game.effects.spawnExplosion(projectile.x, projectile.y, projectile.team);
+          this.game.effects.shake(
+            CONFIG.effects.missileShake,
+            CONFIG.effects.missileShakeDuration
+          );
+
+          for (const fighter of this.game.fighters) {
+            if (fighter.team === projectile.team) continue;
+            if (
+              Math.hypot(fighter.x - projectile.x, fighter.y - projectile.y) >
+              CONFIG.items.missileAoeRadius
+            ) {
+              continue;
+            }
+            if (!this.game.map.hasLineOfSight(projectile.x, projectile.y, fighter.x, fighter.y)) {
+              continue;
+            }
+            const stunned = fighter.applyStun(CONFIG.items.missileStun, source, {
+              dropItem: CONFIG.items.dropItemOnStun
+            });
+            if (stunned) fighter.knockAway(projectile.x, projectile.y, 5);
+          }
+        }
+
+        use(fighter, type) {
+          if (
+            fighter.isStunned ||
+            fighter.itemCooldown > 0 ||
+            !fighter.inventory ||
+            fighter.inventory.type !== type
+          ) {
+            return false;
+          }
+
+          fighter.inventory = null;
+          fighter.itemCooldown = CONFIG.items.publicCooldown;
+
+          if (type === "hammer") {
+            this.useHammer(fighter);
+          } else if (type === "missile") {
+            this.useMissile(fighter);
+          } else if (type === "trap") {
+            this.useTrap(fighter);
+          }
+
+          this.game.notify(`USED: ${this.itemName(type)}`);
+          return true;
+        }
+
+        useHammer(fighter) {
+          this.game.effects.spawnHammer(fighter.x, fighter.y, fighter.aimAngle, fighter.team);
+          this.game.effects.spawnInkBurst(
+            fighter.x + Math.cos(fighter.aimAngle) * 18,
+            fighter.y + Math.sin(fighter.aimAngle) * 18,
+            teamColor(fighter.team),
+            7,
+            38
+          );
+
+          let hits = 0;
+          for (const enemy of this.game.fighters) {
+            if (enemy.team === fighter.team) continue;
+            const dx = enemy.x - fighter.x;
+            const dy = enemy.y - fighter.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist > CONFIG.items.hammerRange) continue;
+            const angle = Math.atan2(dy, dx);
+            if (Math.abs(angleDifference(angle, fighter.aimAngle)) > CONFIG.items.hammerHalfAngle) continue;
+            if (!this.game.map.hasLineOfSight(fighter.x, fighter.y, enemy.x, enemy.y)) continue;
+
+            const stunned = enemy.applyStun(CONFIG.items.hammerStun, fighter, {
+              dropItem: CONFIG.items.dropItemOnStun
+            });
+            if (stunned) {
+              enemy.knockAway(fighter.x, fighter.y, 7);
+              hits++;
+            }
+          }
+
+          if (hits > 0) {
+            this.game.effects.shake(
+              CONFIG.effects.hitShake * 0.8,
+              CONFIG.effects.hitShakeDuration
+            );
+          }
+        }
+
+        useMissile(fighter) {
+          const startX = fighter.x + Math.cos(fighter.aimAngle) * 8;
+          const startY = fighter.y + Math.sin(fighter.aimAngle) * 8;
+          this.projectiles.push({
+            id: this.nextId++,
+            ownerId: fighter.id,
+            team: fighter.team,
+            x: startX,
+            y: startY,
+            angle: fighter.aimAngle,
+            life: CONFIG.items.missileLifetime,
+            dead: false
+          });
+          this.game.effects.spawnInkBurst(startX, startY, P.cream, 5, 28);
+        }
+
+        useTrap(fighter) {
+          const point = this.game.map.nearestOpenCell(fighter.x, fighter.y);
+          if (!point) return;
+          this.traps.push({
+            id: this.nextId++,
+            source: fighter,
+            team: fighter.team,
+            x: point.x,
+            y: point.y,
+            armTime: CONFIG.items.trapArmTime,
+            life: CONFIG.items.trapLifetime,
+            dead: false
+          });
+          this.game.effects.spawnInkBurst(point.x, point.y, teamColor(fighter.team), 5, 20);
+        }
+
+        itemName(type) {
+          if (type === "hammer") return "HAMMER";
+          if (type === "missile") return "MISSILE";
+          return "TRAP";
+        }
+      }
+
+      // ============================================================
+      // 8. AI：涂色、拾取、冲撞、避险四状态机
+      // ============================================================
+      class AIController {
+        constructor(game, fighter, slot) {
+          this.game = game;
+          this.fighter = fighter;
+          this.slot = slot;
+          this.state = "PAINT";
+          this.stateTime = 0;
+          this.decisionTimer = randomRange(0, CONFIG.ai.decisionInterval);
+          this.path = [];
+          this.pathIndex = 0;
+          this.target = null;
+          this.targetCrateId = null;
+          this.lastRepath = 0;
+          this.stuckTime = 0;
+          this.lastX = fighter.x;
+          this.lastY = fighter.y;
+        }
+
+        update(dt) {
+          if (this.fighter.isStunned) {
+            this.fighter.update(dt, {
+              moveX: 0,
+              moveY: 0,
+              aimAngle: this.fighter.aimAngle,
+              dash: false,
+              itemUse: false
+            });
+            return;
+          }
+
+          this.stateTime += dt;
+          this.decisionTimer -= dt;
+          this.lastRepath += dt;
+
+          if (this.decisionTimer <= 0) {
+            this.decisionTimer = CONFIG.ai.decisionInterval;
+            this.chooseState();
+          }
+
+          const controls = {
+            moveX: 0,
+            moveY: 0,
+            aimAngle: this.fighter.aimAngle,
+            dash: false,
+            itemUse: false
+          };
+
+          if (this.state === "ATTACK") {
+            this.updateAttack(controls);
+          } else if (this.state === "EVADE") {
+            this.updateEvade(controls);
+          } else if (this.state === "SEEK_ITEM") {
+            this.updateSeekItem(controls);
+          } else {
+            this.updatePaint(controls);
+          }
+
+          this.configureItemUse(controls);
+
+          // 若被障碍卡住超过一小段时间，立刻重新规划路径。
+          const moved = Math.hypot(this.fighter.x - this.lastX, this.fighter.y - this.lastY);
+          if (moved < 0.06 && (controls.moveX || controls.moveY) && !this.fighter.isRooted) {
+            this.stuckTime += dt;
+          } else {
+            this.stuckTime = 0;
+          }
+          this.lastX = this.fighter.x;
+          this.lastY = this.fighter.y;
+          if (this.stuckTime > 0.4) {
+            this.stuckTime = 0;
+            this.repath();
+          }
+
+          this.fighter.update(dt, controls);
+        }
+
+        chooseState() {
+          const threat = this.game.hero;
+          if (!threat) {
+            this.setState("PAINT");
+            return;
+          }
+          const distToThreat = Math.hypot(
+            threat.x - this.fighter.x,
+            threat.y - this.fighter.y
+          );
+          const nearestCrate = this.game.items.getNearestCrate(
+            this.fighter.x,
+            this.fighter.y,
+            CONFIG.ai.itemSeekRange
+          );
+
+          // 眩晕恢复后短时避险，避免 AI 一站起来又被正面冲撞。
+          if (
+            this.fighter.recoverFleeTime > 0 &&
+            distToThreat < CONFIG.ai.dangerRange * 1.8
+          ) {
+            this.setState("EVADE");
+            return;
+          }
+
+          // 附近有空手可拾取的道具时，优先补充资源。
+          if (!this.fighter.inventory && nearestCrate) {
+            this.setState("SEEK_ITEM");
+            return;
+          }
+
+          // 距离合适、视线无遮挡且冲撞就绪时，主动发起攻击。
+          if (
+            !threat.isStunned &&
+            distToThreat <= CONFIG.ai.attackRange &&
+            this.fighter.dashCooldown <= 0 &&
+            this.game.map.hasLineOfSight(
+              this.fighter.x,
+              this.fighter.y,
+              threat.x,
+              threat.y
+            )
+          ) {
+            this.setState("ATTACK");
+            return;
+          }
+
+          // 冲撞尚未就绪且对手贴近时绕开，形成“状态不利则避险”的行为。
+          if (
+            !threat.isStunned &&
+            distToThreat <= CONFIG.ai.dangerRange &&
+            this.fighter.dashCooldown > 0.2
+          ) {
+            this.setState("EVADE");
+            return;
+          }
+
+          this.setState("PAINT");
+        }
+
+        setState(nextState) {
+          if (nextState === this.state) {
+            if (nextState === "SEEK_ITEM" && !this.target) this.acquireCrateTarget();
+            return;
+          }
+          this.state = nextState;
+          this.stateTime = 0;
+          this.path = [];
+          this.pathIndex = 0;
+          this.target = null;
+          this.targetCrateId = null;
+          this.stuckTime = 0;
+
+          if (nextState === "PAINT") {
+            this.choosePaintTarget();
+          } else if (nextState === "SEEK_ITEM") {
+            this.acquireCrateTarget();
+          } else if (nextState === "EVADE") {
+            this.chooseEvadeTarget();
+          }
+        }
+
+        choosePaintTarget() {
+          const target = this.game.map.choosePaintTarget(
+            this.fighter.team,
+            this.fighter.x,
+            this.fighter.y
+          );
+          if (!target) return;
+          this.target = target;
+          this.buildPath(target.x, target.y);
+        }
+
+        acquireCrateTarget() {
+          const crate = this.game.items.getNearestCrate(
+            this.fighter.x,
+            this.fighter.y,
+            CONFIG.ai.itemSeekRange * 1.4
+          );
+          if (!crate) {
+            this.setState("PAINT");
+            return;
+          }
+          this.target = { x: crate.x, y: crate.y };
+          this.targetCrateId = crate.id;
+          this.buildPath(crate.x, crate.y);
+        }
+
+        chooseEvadeTarget() {
+          const threat = this.game.hero;
+          if (!threat) return;
+          this.target = this.game.map.chooseFleeTarget(
+            this.fighter.x,
+            this.fighter.y,
+            threat.x,
+            threat.y
+          );
+          if (this.target) this.buildPath(this.target.x, this.target.y);
+        }
+
+        buildPath(x, y) {
+          this.path = this.game.map.findPath(this.fighter.x, this.fighter.y, x, y);
+          this.pathIndex = 0;
+          this.lastRepath = 0;
+        }
+
+        repath() {
+          if (this.state === "ATTACK") return;
+          if (this.state === "SEEK_ITEM") {
+            if (this.target) this.buildPath(this.target.x, this.target.y);
+          } else if (this.target) {
+            this.buildPath(this.target.x, this.target.y);
+          } else {
+            this.choosePaintTarget();
+          }
+        }
+
+        followPath(controls) {
+          while (
+            this.pathIndex < this.path.length &&
+            Math.hypot(
+              this.path[this.pathIndex].x - this.fighter.x,
+              this.path[this.pathIndex].y - this.fighter.y
+            ) < 4.5
+          ) {
+            this.pathIndex++;
+          }
+
+          if (this.pathIndex >= this.path.length) {
+            controls.moveX = 0;
+            controls.moveY = 0;
+            return true;
+          }
+
+          const node = this.path[this.pathIndex];
+          const direction = normalize(node.x - this.fighter.x, node.y - this.fighter.y);
+          controls.moveX = direction.x;
+          controls.moveY = direction.y;
+          controls.aimAngle = Math.atan2(direction.y, direction.x);
+          return false;
+        }
+
+        updatePaint(controls) {
+          if (!this.target || this.path.length === 0) {
+            this.choosePaintTarget();
+            if (!this.target) return;
+          }
+
+          const atEnd = this.followPath(controls);
+          if (atEnd && this.stateTime > 0.12) {
+            this.choosePaintTarget();
+            this.stateTime = 0;
+          }
+        }
+
+        updateSeekItem(controls) {
+          if (this.fighter.inventory) {
+            this.setState("PAINT");
+            return;
+          }
+          const crate = this.game.items.crates.find(
+            (candidate) => candidate.id === this.targetCrateId && !candidate.dead
+          );
+          if (!crate) {
+            this.acquireCrateTarget();
+            return;
+          }
+
+          this.target.x = crate.x;
+          this.target.y = crate.y;
+          if (this.path.length === 0 && this.lastRepath > 0.5) {
+            this.buildPath(crate.x, crate.y);
+          }
+          const atEnd = this.followPath(controls);
+          if (atEnd) {
+            controls.moveX = 0;
+            controls.moveY = 0;
+            controls.aimAngle = Math.atan2(crate.y - this.fighter.y, crate.x - this.fighter.x);
+          }
+        }
+
+        updateAttack(controls) {
+          const target = this.game.hero;
+          if (!target) {
+            this.setState("PAINT");
+            return;
+          }
+          const dx = target.x - this.fighter.x;
+          const dy = target.y - this.fighter.y;
+          const dist = Math.hypot(dx, dy);
+          const direction = normalize(dx, dy);
+          controls.aimAngle = Math.atan2(dy, dx);
+
+          if (dist > 30) {
+            controls.moveX = direction.x;
+            controls.moveY = direction.y;
+          } else if (dist < 17) {
+            controls.moveX = -direction.x;
+            controls.moveY = -direction.y;
+          }
+
+          const hasSight = this.game.map.hasLineOfSight(
+            this.fighter.x,
+            this.fighter.y,
+            target.x,
+            target.y
+          );
+          if (
+            this.fighter.dashCooldown <= 0 &&
+            dist >= 14 &&
+            dist <= CONFIG.ai.attackRange &&
+            hasSight &&
+            !target.isStunned
+          ) {
+            controls.dash = true;
+          }
+        }
+
+        updateEvade(controls) {
+          if (!this.target || this.path.length === 0) this.chooseEvadeTarget();
+          const atEnd = this.followPath(controls);
+          if (
+            this.stateTime >= CONFIG.ai.fleeDuration ||
+            (atEnd && this.stateTime > 0.25)
+          ) {
+            const threat = this.game.hero;
+            const dist = threat
+              ? Math.hypot(threat.x - this.fighter.x, threat.y - this.fighter.y)
+              : 999;
+            if (dist > CONFIG.ai.dangerRange * 1.45 || this.stateTime >= CONFIG.ai.fleeDuration * 1.7) {
+              this.setState("PAINT");
+            } else {
+              this.chooseEvadeTarget();
+              this.stateTime = 0;
+            }
+          }
+        }
+
+        configureItemUse(controls) {
+          if (!this.fighter.inventory || this.fighter.itemCooldown > 0 || this.fighter.isStunned) return;
+          const target = this.game.getNearestEnemy(this.fighter.team, this.fighter.x, this.fighter.y);
+          if (!target) return;
+          const dx = target.x - this.fighter.x;
+          const dy = target.y - this.fighter.y;
+          const dist = Math.hypot(dx, dy);
+          const type = this.fighter.inventory.type;
+
+          if (type === "hammer" && dist <= CONFIG.items.hammerRange * 0.9) {
+            controls.aimAngle = Math.atan2(dy, dx);
+            controls.itemUse = true;
+          } else if (
+            type === "missile" &&
+            dist >= 28 &&
+            dist <= 170 &&
+            this.game.map.hasLineOfSight(this.fighter.x, this.fighter.y, target.x, target.y)
+          ) {
+            controls.aimAngle = Math.atan2(dy, dx);
+            controls.itemUse = true;
+          } else if (
+            type === "trap" &&
+            (this.state === "EVADE" || this.state === "PAINT") &&
+            dist <= 58
+          ) {
+            controls.itemUse = true;
+          }
+        }
+      }
+
+      // ============================================================
+      // 9. Collision：冲撞先手、互晕、击退与普通实体分离
+      // ============================================================
+      class CollisionSystem {
+        constructor(game) {
+          this.game = game;
+        }
+
+        update() {
+          const fighters = this.game.fighters;
+          for (let i = 0; i < fighters.length; i++) {
+            for (let j = i + 1; j < fighters.length; j++) {
+              const a = fighters[i];
+              const b = fighters[j];
+              if (a.team === b.team) {
+                this.separateBodies(a, b);
+                continue;
+              }
+              this.handleOpponents(a, b);
+            }
+          }
+        }
+
+        handleOpponents(a, b) {
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const dist = Math.hypot(dx, dy);
+          const touchDistance = a.radius + b.radius + 2;
+          if (dist > touchDistance) {
+            this.separateBodies(a, b);
+            return;
+          }
+
+          if (a.isDashing && b.isDashing) {
+            this.resolveDashClash(a, b);
+            return;
+          }
+
+          if (a.isDashing && !a.dashHitIds.has(b.id)) {
+            this.landDash(a, b);
+            return;
+          }
+
+          if (b.isDashing && !b.dashHitIds.has(a.id)) {
+            this.landDash(b, a);
+            return;
+          }
+
+          this.separateBodies(a, b);
+        }
+
+        resolveDashClash(a, b) {
+          // 先进入突进状态由固定逻辑帧决定；不比较移动速度或 UI 时间差。
+          const sameFrame = a.dashStartFrame === b.dashStartFrame;
+
+          if (sameFrame) {
+            if (a.applyStun(CONFIG.fighter.mutualStunDuration, b, {
+              dropItem: CONFIG.items.dropItemOnStun
+            })) {
+              a.knockAway(b.x, b.y, CONFIG.fighter.knockbackDistance * 0.8);
+            }
+            if (b.applyStun(CONFIG.fighter.mutualStunDuration, a, {
+              dropItem: CONFIG.items.dropItemOnStun
+            })) {
+              b.knockAway(a.x, a.y, CONFIG.fighter.knockbackDistance * 0.8);
+            }
+            a.cancelDash();
+            b.cancelDash();
+            a.dashHitIds.add(b.id);
+            b.dashHitIds.add(a.id);
+            this.createImpact(
+              (a.x + b.x) / 2,
+              (a.y + b.y) / 2,
+              P.yellow,
+              0.7
+            );
+            this.game.notify("MUTUAL STUN");
+            return;
+          }
+
+          const first = a.dashStartFrame < b.dashStartFrame ? a : b;
+          const second = first === a ? b : a;
+          const stunned = second.applyStun(CONFIG.fighter.stunDuration, first, {
+            dropItem: CONFIG.items.dropItemOnStun
+          });
+          first.dashHitIds.add(second.id);
+          second.dashHitIds.add(first.id);
+          first.cancelDash();
+          second.cancelDash();
+
+          if (stunned) {
+            second.knockAway(first.x, first.y, CONFIG.fighter.knockbackDistance);
+            this.createImpact(
+              (a.x + b.x) / 2,
+              (a.y + b.y) / 2,
+              teamColor(first.team),
+              1
+            );
+          }
+        }
+
+        landDash(attacker, victim) {
+          attacker.dashHitIds.add(victim.id);
+          const stunned = victim.applyStun(CONFIG.fighter.stunDuration, attacker, {
+            dropItem: CONFIG.items.dropItemOnStun
+          });
+          if (!stunned) return;
+
+          attacker.cancelDash();
+          victim.cancelDash();
+          victim.knockAway(attacker.x, attacker.y, CONFIG.fighter.knockbackDistance);
+          this.createImpact(
+            (attacker.x + victim.x) / 2,
+            (attacker.y + victim.y) / 2,
+            teamColor(attacker.team),
+            1
+          );
+        }
+
+        createImpact(x, y, color, power) {
+          this.game.effects.spawnHit(x, y, color);
+          this.game.effects.shake(
+            CONFIG.effects.hitShake * power,
+            CONFIG.effects.hitShakeDuration
+          );
+        }
+
+        separateBodies(a, b) {
+          if (a.isDashing || b.isDashing) return;
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const dist = Math.hypot(dx, dy);
+          const minDistance = (a.radius + b.radius) * 0.88;
+          if (dist <= 0.001 || dist >= minDistance) return;
+
+          const push = (minDistance - dist) * 0.5;
+          const nx = dx / dist;
+          const ny = dy / dist;
+          this.game.map.moveEntity(a, -nx * push, -ny * push);
+          this.game.map.moveEntity(b, nx * push, ny * push);
+        }
+      }
+
+      // ============================================================
+      // 10. UI / Renderer：像素字体、程序化精灵、地图和 HUD
+      // ============================================================
+      const PIXEL_FONT = {
+        "0": ["111", "101", "101", "101", "111"],
+        "1": ["010", "110", "010", "010", "111"],
+        "2": ["111", "001", "111", "100", "111"],
+        "3": ["111", "001", "111", "001", "111"],
+        "4": ["101", "101", "111", "001", "001"],
+        "5": ["111", "100", "111", "001", "111"],
+        "6": ["111", "100", "111", "101", "111"],
+        "7": ["111", "001", "010", "010", "010"],
+        "8": ["111", "101", "111", "101", "111"],
+        "9": ["111", "101", "111", "001", "111"],
+        A: ["010", "101", "111", "101", "101"],
+        B: ["110", "101", "110", "101", "110"],
+        C: ["011", "100", "100", "100", "011"],
+        D: ["110", "101", "101", "101", "110"],
+        E: ["111", "100", "110", "100", "111"],
+        F: ["111", "100", "110", "100", "100"],
+        G: ["011", "100", "101", "101", "011"],
+        H: ["101", "101", "111", "101", "101"],
+        I: ["111", "010", "010", "010", "111"],
+        J: ["001", "001", "001", "101", "010"],
+        K: ["101", "101", "110", "101", "101"],
+        L: ["100", "100", "100", "100", "111"],
+        M: ["101", "111", "111", "101", "101"],
+        N: ["101", "111", "111", "111", "101"],
+        O: ["010", "101", "101", "101", "010"],
+        P: ["110", "101", "110", "100", "100"],
+        Q: ["010", "101", "101", "011", "001"],
+        R: ["110", "101", "110", "101", "101"],
+        S: ["011", "100", "010", "001", "110"],
+        T: ["111", "010", "010", "010", "010"],
+        U: ["101", "101", "101", "101", "111"],
+        V: ["101", "101", "101", "101", "010"],
+        W: ["101", "101", "111", "111", "101"],
+        X: ["101", "101", "010", "101", "101"],
+        Y: ["101", "101", "010", "010", "010"],
+        Z: ["111", "001", "010", "100", "111"],
+        ":": ["000", "010", "000", "010", "000"],
+        "%": ["101", "001", "010", "100", "101"],
+        "?": ["110", "001", "010", "000", "010"],
+        "-": ["000", "000", "111", "000", "000"],
+        "/": ["001", "001", "010", "100", "100"],
+        ".": ["000", "000", "000", "000", "010"],
+        "!": ["010", "010", "010", "000", "010"],
+        " ": ["000", "000", "000", "000", "000"]
+      };
+
+      function pixelTextWidth(text, scale = 1) {
+        return Math.max(0, (String(text).length * 4 - 1) * scale);
+      }
+
+      function drawPixelText(ctx, text, x, y, scale = 1, color = P.cream, align = "left") {
+        const safeText = String(text).toUpperCase();
+        const width = pixelTextWidth(safeText, scale);
+        let drawX = Math.round(x);
+        if (align === "center") drawX -= Math.round(width / 2);
+        if (align === "right") drawX -= width;
+        const drawY = Math.round(y);
+        ctx.fillStyle = color;
+
+        for (let charIndex = 0; charIndex < safeText.length; charIndex++) {
+          const glyph = PIXEL_FONT[safeText[charIndex]] || PIXEL_FONT["?"];
+          for (let row = 0; row < glyph.length; row++) {
+            for (let column = 0; column < glyph[row].length; column++) {
+              if (glyph[row][column] !== "1") continue;
+              ctx.fillRect(
+                drawX + charIndex * 4 * scale + column * scale,
+                drawY + row * scale,
+                scale,
+                scale
+              );
+            }
+          }
+        }
+      }
+
+      class Renderer {
+        constructor(game, canvas) {
+          this.game = game;
+          this.canvas = canvas;
+          this.ctx = canvas.getContext("2d", { alpha: false });
+          this.ctx.imageSmoothingEnabled = false;
+          this.renderTime = 0;
+          this.sprites = this.createSprites();
+        }
+
+        createSprites() {
+          const result = { 1: [], 2: [], 3: [] };
+          for (const team of [1, 2, 3]) {
+            for (let direction = 0; direction < 8; direction++) {
+              result[team][direction] = [];
+              for (let frame = 0; frame < 2; frame++) {
+                result[team][direction][frame] = this.createOneSprite(team, direction, frame);
+              }
+            }
+          }
+          return result;
+        }
+
+        createOneSprite(team, direction, frame) {
+          const sprite = document.createElement("canvas");
+          sprite.width = 24;
+          sprite.height = 24;
+          const g = sprite.getContext("2d");
+          g.imageSmoothingEnabled = false;
+          const color = teamColor(team);
+          const angle = direction * Math.PI / 4;
+          const dx = Math.cos(angle);
+          const dy = Math.sin(angle);
+          const px = -dy;
+          const py = dx;
+          const cx = 12;
+          const cy = 11;
+
+          // 枪口和手臂先画，角色身体会遮住其中一段。
+          for (let step = 3; step <= 9; step += 2) {
+            const gx = Math.round(cx + dx * step);
+            const gy = Math.round(cy + dy * step);
+            g.fillStyle = P.ink;
+            g.fillRect(gx - 1, gy - 1, 3, 3);
+            g.fillStyle = step >= 7 ? P.cream : P.slate;
+            g.fillRect(gx, gy, 1, 1);
+          }
+          g.fillStyle = color;
+          g.fillRect(Math.round(cx + dx * 9), Math.round(cy + dy * 9), 2, 2);
+
+          // 反方向的发梢让八个朝向更清楚。
+          const backX = cx - dx * 6;
+          const backY = cy - dy * 5;
+          for (const side of [-1, 1]) {
+            const tx = Math.round(backX + px * 4 * side);
+            const ty = Math.round(backY + py * 4 * side);
+            g.fillStyle = P.ink;
+            g.fillRect(tx - 2, ty - 2, 4, 7);
+            g.fillStyle = color;
+            g.fillRect(tx - 1, ty - 2, 3, 5);
+          }
+
+          // 交替脚步构成两帧移动动画。
+          const legShift = frame === 0 ? 0 : 1;
+          g.fillStyle = P.ink;
+          g.fillRect(6 - legShift, 17, 4, 4);
+          g.fillRect(14 + legShift, 17, 4, 4);
+          g.fillStyle = P.slate;
+          g.fillRect(7 - legShift, 19, 3, 2);
+          g.fillRect(14 + legShift, 19, 3, 2);
+
+          // 大头、描边和队色头巾。
+          g.fillStyle = P.ink;
+          g.fillRect(4, 5, 16, 13);
+          g.fillRect(5, 4, 14, 15);
+          g.fillStyle = color;
+          g.fillRect(5, 6, 14, 11);
+          g.fillStyle = P.cream;
+          g.fillRect(6, 8, 12, 7);
+          g.fillStyle = color;
+          g.fillRect(5, 5, 14, 4);
+          g.fillRect(4, 8, 2, 5);
+          g.fillRect(18, 8, 2, 5);
+
+          // 面向屏幕上方时主要看到后脑勺；其余方向显示像素眼睛。
+          if (dy > -0.72) {
+            const eyeX = Math.round(dx * 1.6);
+            const eyeY = Math.round(dy * 0.9);
+            g.fillStyle = P.ink;
+            if (dy > 0.7) {
+              g.fillRect(8 + eyeX, 10 + eyeY, 2, 3);
+              g.fillRect(14 + eyeX, 10 + eyeY, 2, 3);
+            } else if (dx > 0.55) {
+              g.fillRect(13 + eyeX, 10 + eyeY, 2, 3);
+            } else if (dx < -0.55) {
+              g.fillRect(9 + eyeX, 10 + eyeY, 2, 3);
+            } else {
+              g.fillRect(8 + eyeX, 10 + eyeY, 2, 3);
+              g.fillRect(14 + eyeX, 10 + eyeY, 2, 3);
+            }
+            g.fillStyle = P.white;
+            g.fillRect(9 + eyeX, 10 + eyeY, 1, 1);
+            g.fillRect(14 + eyeX, 10 + eyeY, 1, 1);
+          }
+
+          // 顶部单像素高光，强化低分辨率像素画质感。
+          g.fillStyle = P.fog;
+          g.fillRect(7, 6, 3, 1);
+          g.fillStyle = P.ink;
+          g.fillRect(7, 16, 10, 1);
+          return sprite;
+        }
+
+        directionIndex(angle) {
+          const index = Math.round(angle / (Math.PI / 4)) % 8;
+          return index < 0 ? index + 8 : index;
+        }
+
+        render() {
+          this.renderTime = performance.now() / 1000;
+          const ctx = this.ctx;
+          ctx.imageSmoothingEnabled = false;
+          ctx.fillStyle = P.ink;
+          ctx.fillRect(0, 0, CONFIG.view.width, CONFIG.view.height);
+
+          const shake = this.game.effects
+            ? this.game.effects.getShakeOffset(this.renderTime)
+            : { x: 0, y: 0 };
+          const offsetY = CONFIG.view.playOffsetY;
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(0, offsetY, CONFIG.view.width, MAP_H);
+          ctx.clip();
+          ctx.translate(shake.x, offsetY + shake.y);
+
+          this.drawMap();
+          this.drawTraps();
+          this.drawCrates();
+          this.drawDashGhosts();
+          this.drawFighters();
+          this.drawProjectiles();
+          this.drawEffects();
+          this.drawAimReticle();
+
+          ctx.restore();
+          this.drawHud();
+        }
+
+        drawMap() {
+          const ctx = this.ctx;
+          const game = this.game;
+          ctx.drawImage(game.map.cache, 0, 0);
+
+          // 极淡网格帮助观察 tile 边界，白底仍然是初始状态。
+          ctx.save();
+          ctx.globalAlpha = 0.11;
+          ctx.fillStyle = P.fog;
+          for (let x = 0; x <= game.map.cols; x++) {
+            ctx.fillRect(x * TILE, 0, 1, MAP_H);
+          }
+          for (let y = 0; y <= game.map.rows; y++) {
+            ctx.fillRect(0, y * TILE, MAP_W, 1);
+          }
+          ctx.restore();
+
+          for (const rect of game.map.obstacleRects) {
+            this.drawObstacle(rect);
+          }
+
+          ctx.strokeStyle = P.ink;
+          ctx.lineWidth = 2;
+          ctx.strokeRect(1, 1, MAP_W - 2, MAP_H - 2);
+        }
+
+        drawObstacle(rect) {
+          const ctx = this.ctx;
+          const x = rect.x * TILE;
+          const y = rect.y * TILE;
+          const width = rect.w * TILE;
+          const height = rect.h * TILE;
+
+          ctx.fillStyle = P.ink;
+          ctx.fillRect(x + 2, y + 2, width, height);
+          ctx.fillStyle = P.white;
+          ctx.fillRect(x, y, width, height - 2);
+          ctx.fillStyle = P.ink;
+          ctx.fillRect(x, y, width, 5);
+          ctx.fillStyle = P.orange;
+          ctx.fillRect(x + 2, y + 2, Math.max(1, width - 4), 2);
+          ctx.fillStyle = P.ink;
+          ctx.fillRect(x, y + height - 3, width, 3);
+
+          for (let bx = x + 7; bx < x + width; bx += 16) {
+            for (let by = y + 8; by < y + height; by += 16) {
+              ctx.fillStyle = P.ink;
+              ctx.fillRect(bx, by, 3, 3);
+              ctx.fillStyle = P.orange;
+              ctx.fillRect(bx, by, 1, 1);
+              ctx.fillStyle = P.white;
+              ctx.fillRect(bx + 2, by + 2, 1, 1);
+            }
+          }
+        }
+
+        drawTraps() {
+          const ctx = this.ctx;
+          for (const trap of this.game.items.traps) {
+            const armed = trap.armTime <= 0;
+            const blink = !armed || Math.sin(this.renderTime * 9 + trap.id) > 0;
+            const x = Math.round(trap.x);
+            const y = Math.round(trap.y);
+            ctx.fillStyle = P.ink;
+            ctx.fillRect(x - 7, y - 5, 14, 10);
+            ctx.fillStyle = blink ? (armed ? P.yellow : P.slate) : P.red;
+            ctx.fillRect(x - 6, y - 4, 12, 8);
+            ctx.fillStyle = P.ink;
+            ctx.fillRect(x - 4, y - 2, 8, 4);
+            ctx.fillStyle = teamColor(trap.team);
+            ctx.fillRect(x - 7, y - 7, 3, 2);
+            ctx.fillRect(x + 4, y + 5, 3, 2);
+            if (armed) {
+              ctx.fillStyle = P.red;
+              ctx.fillRect(x - 1, y - 1, 2, 2);
+            }
+          }
+        }
+
+        drawCrates() {
+          const ctx = this.ctx;
+          for (const crate of this.game.items.crates) {
+            const bob = Math.round(Math.sin(crate.age * 3.4 + crate.bobSeed) * 1.5);
+            const x = Math.round(crate.x);
+            const y = Math.round(crate.y) + bob;
+            ctx.save();
+            ctx.globalAlpha = 0.28;
+            ctx.fillStyle = P.ink;
+            ctx.fillRect(x - 6, y + 5, 12, 3);
+            ctx.restore();
+
+            ctx.fillStyle = P.ink;
+            ctx.fillRect(x - 6, y - 6, 12, 12);
+            ctx.fillStyle = crate.dropped ? P.red : P.brown;
+            ctx.fillRect(x - 5, y - 5, 10, 10);
+            ctx.fillStyle = P.yellow;
+            ctx.fillRect(x - 5, y - 5, 10, 2);
+            ctx.fillRect(x - 5, y + 3, 10, 2);
+            ctx.fillStyle = P.cream;
+            ctx.fillRect(x, y - 5, 2, 10);
+            drawPixelText(ctx, "?", x + 1, y - 2, 1, P.ink, "center");
+          }
+        }
+
+        drawDashGhosts() {
+          const ctx = this.ctx;
+          for (const ghost of this.game.effects.dashGhosts) {
+            const ratio = ghost.life / ghost.maxLife;
+            ctx.save();
+            ctx.globalAlpha = ratio * 0.32;
+            ctx.fillStyle = teamColor(ghost.team);
+            ctx.fillRect(Math.round(ghost.x) - 5, Math.round(ghost.y) - 8, 10, 13);
+            ctx.fillStyle = P.ink;
+            ctx.fillRect(Math.round(ghost.x) - 3, Math.round(ghost.y) + 3, 8, 2);
+            ctx.restore();
+          }
+        }
+
+        drawFighters() {
+          const sorted = [...this.game.fighters].sort((a, b) => a.y - b.y);
+          for (const fighter of sorted) this.drawFighter(fighter);
+        }
+
+        drawFighter(fighter) {
+          const ctx = this.ctx;
+          const direction = this.directionIndex(fighter.aimAngle);
+          const movingFrame = fighter.isMoving
+            ? Math.floor(fighter.moveTime * 11) % 2
+            : 0;
+          const idleBob =
+            !fighter.isMoving && !fighter.isStunned
+              ? Math.sin(fighter.idleTime * 3.1) > 0.72 ? -1 : 0
+              : 0;
+          const x = Math.round(fighter.x);
+          const y = Math.round(fighter.y);
+
+          ctx.save();
+          ctx.globalAlpha = 0.3;
+          ctx.fillStyle = P.ink;
+          ctx.fillRect(x - 7, y + 4, 14, 4);
+          ctx.fillRect(x - 5, y + 7, 10, 2);
+          ctx.restore();
+
+          if (fighter.isDashing) {
+            const dx = Math.cos(fighter.dashAngle);
+            const dy = Math.sin(fighter.dashAngle);
+            ctx.save();
+            ctx.globalAlpha = 0.55;
+            for (let i = 1; i <= 3; i++) {
+              ctx.fillStyle = i === 1 ? teamColor(fighter.team) : P.ink;
+              ctx.fillRect(
+                Math.round(x - dx * i * 5) - 2,
+                Math.round(y - dy * i * 5) - 2,
+                i === 1 ? 4 : 2,
+                i === 1 ? 4 : 2
+              );
+            }
+            ctx.restore();
+          }
+
+          const sprite = this.sprites[fighter.team][direction][movingFrame];
+          ctx.drawImage(sprite, x - 12, y - 17 + idleBob);
+
+          if (fighter.inventory) {
+            ctx.fillStyle = P.ink;
+            ctx.fillRect(x + 7, y - 17, 10, 10);
+            ctx.fillStyle = P.cream;
+            ctx.fillRect(x + 8, y - 16, 8, 8);
+            this.drawItemIcon(ctx, fighter.inventory.type, x + 9, y - 15, 6);
+          }
+
+          if (fighter.isStunned) this.drawStunStars(fighter);
+          if (fighter.isRooted) this.drawRootStatus(fighter);
+
+          const cooldownRatio = 1 - fighter.dashCooldown / CONFIG.fighter.dashCooldown;
+          ctx.fillStyle = P.ink;
+          ctx.fillRect(x - 6, y + 9, 12, 3);
+          ctx.fillStyle = fighter.dashCooldown <= 0 ? P.yellow : teamColor(fighter.team);
+          ctx.fillRect(x - 5, y + 10, Math.round(10 * clamp(cooldownRatio, 0, 1)), 1);
+
+          const label = fighter === this.game.hero
+            ? "YOU"
+            : `AI${fighter.aiIndex || ""}`;
+          const labelWidth = pixelTextWidth(label, 1);
+          ctx.fillStyle = P.white;
+          ctx.fillRect(x - Math.floor(labelWidth / 2) - 2, y - 25, labelWidth + 4, 7);
+          drawPixelText(
+            ctx,
+            label,
+            x,
+            y - 24,
+            1,
+            teamColor(fighter.team),
+            "center"
+          );
+        }
+
+        drawStunStars(fighter) {
+          const ctx = this.ctx;
+          const x = Math.round(fighter.x);
+          const y = Math.round(fighter.y) - 17;
+          for (let i = 0; i < 3; i++) {
+            const angle = this.renderTime * 5 + (i * Math.PI * 2) / 3;
+            const sx = Math.round(x + Math.cos(angle) * 8);
+            const sy = Math.round(y + Math.sin(angle) * 3);
+            ctx.fillStyle = i === 0 ? P.red : P.yellow;
+            ctx.fillRect(sx - 2, sy, 5, 1);
+            ctx.fillRect(sx, sy - 2, 1, 5);
+            ctx.fillStyle = P.ink;
+            ctx.fillRect(sx, sy, 1, 1);
+          }
+        }
+
+        drawRootStatus(fighter) {
+          const ctx = this.ctx;
+          const x = Math.round(fighter.x);
+          const y = Math.round(fighter.y);
+          ctx.fillStyle = P.yellow;
+          ctx.fillRect(x - 8, y + 3, 4, 3);
+          ctx.fillRect(x + 4, y + 3, 4, 3);
+          ctx.fillStyle = P.red;
+          ctx.fillRect(x - 7, y + 5, 3, 2);
+          ctx.fillRect(x + 4, y + 5, 3, 2);
+          ctx.fillStyle = P.ink;
+          ctx.fillRect(x - 2, y + 4, 4, 2);
+          drawPixelText(ctx, "X", x, y - 25, 1, P.red, "center");
+        }
+
+        drawProjectiles() {
+          const ctx = this.ctx;
+          for (const projectile of this.game.items.projectiles) {
+            const dx = Math.cos(projectile.angle);
+            const dy = Math.sin(projectile.angle);
+            const x = Math.round(projectile.x);
+            const y = Math.round(projectile.y);
+            for (let i = 1; i <= 4; i++) {
+              ctx.fillStyle = i < 3 ? teamColor(projectile.team) : P.cream;
+              ctx.fillRect(
+                Math.round(x - dx * i * 3) - 1,
+                Math.round(y - dy * i * 3) - 1,
+                i < 3 ? 2 : 1,
+                i < 3 ? 2 : 1
+              );
+            }
+            ctx.fillStyle = P.ink;
+            ctx.fillRect(x - 2, y - 2, 4, 4);
+            ctx.fillStyle = P.cream;
+            ctx.fillRect(x - 1, y - 1, 2, 2);
+            ctx.fillStyle = P.red;
+            ctx.fillRect(Math.round(x + dx * 3) - 1, Math.round(y + dy * 3) - 1, 2, 2);
+          }
+        }
+
+        drawEffects() {
+          const ctx = this.ctx;
+
+          for (const explosion of this.game.effects.explosions) {
+            const progress = 1 - explosion.life / explosion.maxLife;
+            const radius = CONFIG.items.missileAoeRadius * (0.35 + progress * 0.65);
+            ctx.save();
+            ctx.globalAlpha = 1 - progress;
+            for (let i = 0; i < 14; i++) {
+              const angle = (Math.PI * 2 * i) / 14;
+              const px = Math.round(explosion.x + Math.cos(angle) * radius);
+              const py = Math.round(explosion.y + Math.sin(angle) * radius);
+              ctx.fillStyle = i % 3 === 0 ? P.cream : teamColor(explosion.team);
+              ctx.fillRect(px - 1, py - 1, i % 2 === 0 ? 3 : 2, 3);
+            }
+            ctx.restore();
+          }
+
+          for (const swing of this.game.effects.hammerSwings) {
+            const progress = 1 - swing.life / swing.maxLife;
+            const radius = CONFIG.items.hammerRange * (0.6 + progress * 0.35);
+            ctx.save();
+            ctx.globalAlpha = 0.9 - progress * 0.55;
+            for (let i = 0; i <= 10; i++) {
+              const angle =
+                swing.angle - CONFIG.items.hammerHalfAngle +
+                (CONFIG.items.hammerHalfAngle * 2 * i) / 10;
+              const sx = Math.round(swing.x + Math.cos(angle) * radius);
+              const sy = Math.round(swing.y + Math.sin(angle) * radius);
+              ctx.fillStyle = i % 2 === 0 ? teamColor(swing.team) : P.cream;
+              ctx.fillRect(sx - 1, sy - 1, 3, 3);
+            }
+            ctx.restore();
+          }
+
+          for (const particle of this.game.effects.particles) {
+            const alpha = clamp(particle.life / particle.maxLife, 0, 1);
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = particle.color;
+            ctx.fillRect(
+              Math.round(particle.x),
+              Math.round(particle.y),
+              particle.size,
+              particle.size
+            );
+            ctx.restore();
+          }
+
+          for (const text of this.game.effects.floatingTexts) {
+            ctx.save();
+            ctx.globalAlpha = clamp(text.life / text.maxLife, 0, 1);
+            drawPixelText(ctx, text.text, text.x, text.y, 1, text.color, "center");
+            ctx.restore();
+          }
+        }
+
+        drawAimReticle() {
+          if (this.game.state !== "playing") return;
+          const mouse = this.game.input.mouse;
+          if (!mouse.inside) return;
+          const x = Math.round(mouse.x);
+          const y = Math.round(mouse.y - CONFIG.view.playOffsetY);
+          const ctx = this.ctx;
+          ctx.fillStyle = P.ink;
+          ctx.fillRect(x - 5, y - 1, 10, 3);
+          ctx.fillRect(x - 1, y - 5, 3, 10);
+          ctx.fillStyle = P.orange;
+          ctx.fillRect(x - 4, y, 2, 1);
+          ctx.fillRect(x + 3, y, 2, 1);
+          ctx.fillRect(x, y - 4, 1, 2);
+          ctx.fillRect(x, y + 3, 1, 2);
+          ctx.fillStyle = P.cream;
+          ctx.fillRect(x, y, 1, 1);
+        }
+
+        drawItemIcon(ctx, type, x, y, size = 12) {
+          if (!type) {
+            ctx.fillStyle = P.slate;
+            ctx.fillRect(x + 2, y + size / 2, size - 4, 1);
+            return;
+          }
+
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.scale(size / 12, size / 12);
+          if (type === "hammer") {
+            ctx.fillStyle = P.ink;
+            ctx.fillRect(5, 2, 2, 9);
+            ctx.fillRect(1, 1, 10, 5);
+            ctx.fillStyle = P.cream;
+            ctx.fillRect(5, 3, 1, 7);
+            ctx.fillStyle = P.slate;
+            ctx.fillRect(2, 2, 8, 3);
+            ctx.fillStyle = P.fog;
+            ctx.fillRect(3, 2, 5, 1);
+          } else if (type === "missile") {
+            ctx.fillStyle = P.ink;
+            ctx.fillRect(4, 3, 5, 7);
+            ctx.fillRect(3, 9, 7, 2);
+            ctx.fillStyle = P.cream;
+            ctx.fillRect(5, 2, 3, 7);
+            ctx.fillStyle = P.red;
+            ctx.fillRect(5, 1, 3, 2);
+            ctx.fillStyle = P.yellow;
+            ctx.fillRect(4, 10, 1, 2);
+            ctx.fillRect(7, 10, 1, 2);
+          } else {
+            ctx.fillStyle = P.ink;
+            ctx.fillRect(1, 5, 10, 5);
+            ctx.fillStyle = P.yellow;
+            ctx.fillRect(2, 5, 8, 2);
+            ctx.fillRect(2, 9, 8, 1);
+            ctx.fillStyle = P.ink;
+            ctx.fillRect(3, 4, 1, 3);
+            ctx.fillRect(6, 4, 1, 3);
+            ctx.fillRect(9, 4, 1, 3);
+            ctx.fillStyle = P.red;
+            ctx.fillRect(5, 6, 2, 2);
+          }
+          ctx.restore();
+        }
+
+        drawProgressBar(x, y, width, percent, color, reverse = false) {
+          const ctx = this.ctx;
+          const safePercent = clamp(percent, 0, 100);
+          ctx.fillStyle = P.ink;
+          ctx.fillRect(x - 1, y - 1, width + 2, 8);
+          ctx.fillStyle = P.fog;
+          ctx.fillRect(x, y, width, 6);
+          const fillWidth = Math.round(width * safePercent / 100);
+          ctx.fillStyle = color;
+          if (reverse) {
+            ctx.fillRect(x + width - fillWidth, y, fillWidth, 6);
+          } else {
+            ctx.fillRect(x, y, fillWidth, 6);
+          }
+          ctx.fillStyle = P.cream;
+          if (fillWidth > 0) {
+            ctx.fillRect(reverse ? x + width - fillWidth : x, y, fillWidth, 1);
+          }
+        }
+
+        drawHud() {
+          const ctx = this.ctx;
+          const game = this.game;
+          const coverage = game.coverage || {
+            orangePercent: 0,
+            bluePercent: 0,
+            limePercent: 0
+          };
+          const orangeText = `ORANGE ${formatInteger(coverage.orangePercent, 3)}%`;
+          const blueText = `BLUE ${formatInteger(coverage.bluePercent, 3)}%`;
+          const limeText = `LIME ${formatInteger(coverage.limePercent, 3)}%`;
+
+          ctx.fillStyle = P.ink;
+          ctx.fillRect(0, 0, CONFIG.view.width, CONFIG.view.playOffsetY);
+          ctx.fillStyle = P.slate;
+          ctx.fillRect(0, CONFIG.view.playOffsetY - 1, CONFIG.view.width, 1);
+
+          drawPixelText(ctx, orangeText, 5, 4, 1, P.orange);
+          drawPixelText(ctx, blueText, 166, 4, 1, P.white);
+          drawPixelText(ctx, limeText, 475, 4, 1, P.lime, "right");
+
+          const lowTime = game.matchTime <= 10;
+          const pulse = lowTime
+            ? (Math.sin(this.renderTime * 8) > 0 ? P.orange : P.white)
+            : P.cream;
+          drawPixelText(ctx, formatTime(game.matchTime), 240, 3, 2, pulse, "center");
+          drawPixelText(ctx, "TIME", 240, 13, 1, P.fog, "center");
+
+          this.drawProgressBar(5, 21, 150, coverage.orangePercent, P.orange, false);
+          this.drawProgressBar(165, 21, 150, coverage.bluePercent, P.blue, false);
+          this.drawProgressBar(325, 21, 150, coverage.limePercent, P.lime, false);
+
+          this.drawBottomHud();
+          this.drawNotice();
+        }
+
+        drawBottomHud() {
+          const ctx = this.ctx;
+          const hero = this.game.hero;
+          if (!hero) return;
+          const panelY = CONFIG.view.height - 20;
+
+          ctx.fillStyle = P.ink;
+          ctx.fillRect(4, panelY, 154, 17);
+          ctx.fillStyle = P.slate;
+          ctx.fillRect(4, panelY, 154, 1);
+          ctx.fillRect(4, panelY + 16, 154, 1);
+
+          ctx.fillStyle = P.cream;
+          ctx.fillRect(7, panelY + 2, 13, 13);
+          ctx.fillStyle = P.ink;
+          ctx.fillRect(8, panelY + 3, 11, 11);
+          this.drawItemIcon(
+            ctx,
+            hero.inventory ? hero.inventory.type : null,
+            8,
+            panelY + 3,
+            11
+          );
+
+          const itemName = hero.inventory
+            ? hero.inventory.type === "hammer"
+              ? "HAMMER"
+              : hero.inventory.type === "missile"
+                ? "MISSILE"
+                : "TRAP"
+            : "EMPTY";
+          drawPixelText(ctx, itemName, 24, panelY + 6, 1, hero.inventory ? P.yellow : P.fog);
+
+          drawPixelText(ctx, "DASH", 86, panelY + 3, 1, P.fog);
+          ctx.fillStyle = P.slate;
+          ctx.fillRect(86, panelY + 11, 65, 3);
+          const ready = hero.dashCooldown <= 0;
+          const ratio = 1 - hero.dashCooldown / CONFIG.fighter.dashCooldown;
+          ctx.fillStyle = ready ? P.yellow : P.orange;
+          ctx.fillRect(86, panelY + 11, Math.round(65 * clamp(ratio, 0, 1)), 3);
+
+          if (hero.isStunned) {
+            this.drawStatusChip(
+              `STUN ${hero.status.time.toFixed(1)}`,
+              P.red
+            );
+          } else if (hero.isRooted) {
+            this.drawStatusChip(
+              `ROOT ${hero.status.time.toFixed(1)}`,
+              P.yellow
+            );
+          } else if (hero.inventory && hero.itemCooldown > 0) {
+            this.drawStatusChip(`ITEM CD ${hero.itemCooldown.toFixed(1)}`, P.fog);
+          }
+        }
+
+        drawStatusChip(text, color) {
+          const ctx = this.ctx;
+          const width = pixelTextWidth(text, 1) + 10;
+          const x = CONFIG.view.width - width - 5;
+          const y = CONFIG.view.height - 20;
+          ctx.fillStyle = P.ink;
+          ctx.fillRect(x, y, width, 17);
+          ctx.fillStyle = color;
+          ctx.fillRect(x, y, width, 1);
+          ctx.fillRect(x, y + 16, width, 1);
+          drawPixelText(ctx, text, x + 5, y + 6, 1, color);
+        }
+
+        drawNotice() {
+          if (!this.game.noticeText || this.game.noticeTime <= 0) return;
+          const ctx = this.ctx;
+          const alpha = clamp(this.game.noticeTime * 3, 0, 1);
+          const width = pixelTextWidth(this.game.noticeText, 1) + 14;
+          const x = CONFIG.view.width / 2;
+          const y = CONFIG.view.playOffsetY + 6;
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = P.ink;
+          ctx.fillRect(Math.round(x - width / 2), y, width, 13);
+          ctx.fillStyle = P.yellow;
+          ctx.fillRect(Math.round(x - width / 2), y, width, 1);
+          drawPixelText(ctx, this.game.noticeText, x, y + 4, 1, P.cream, "center");
+          ctx.restore();
+        }
+      }
+
+      // ============================================================
+      // 11. Game：世界组装、输入解释与对局状态
+      // ============================================================
+      class Game {
+        constructor(canvas, input) {
+          this.canvas = canvas;
+          this.input = input;
+          this.gameFrame = document.getElementById("gameFrame");
+          this.startOverlay = document.getElementById("startOverlay");
+          this.pauseOverlay = document.getElementById("pauseOverlay");
+          this.resultOverlay = document.getElementById("resultOverlay");
+          this.resultTitle = document.getElementById("resultTitle");
+          this.resultScore = document.getElementById("resultScore");
+          this.resultNote = document.getElementById("resultNote");
+          this.state = "ready";
+          this.noticeText = "";
+          this.noticeTime = 0;
+          this.scale = 1;
+
+          this.resetWorld();
+          this.renderer = new Renderer(this, canvas);
+          this.bindUI();
+          this.resize();
+        }
+
+        resetWorld() {
+          this.frame = 0;
+          this.elapsed = 0;
+          this.matchTime = CONFIG.matchDuration;
+          this.noticeText = "";
+          this.noticeTime = 0;
+          this.map = new InkMap();
+          this.effects = new Effects(this);
+          this.items = null;
+
+          this.hero = new Fighter(this, {
+            id: "hero",
+            team: 1,
+            x: 46,
+            y: 196,
+            aimAngle: -0.2,
+            name: "ORANGE"
+          });
+
+          const enemySpawns = [
+            { x: 432, y: 44, aimAngle: Math.PI * 0.8 },
+            { x: 432, y: 196, aimAngle: Math.PI * 1.2 }
+          ];
+          this.enemies = [];
+          for (let i = 0; i < CONFIG.ai.count; i++) {
+            const spawn = enemySpawns[i % enemySpawns.length];
+            const fighter = new Fighter(this, {
+              id: `ai-${i + 1}`,
+              team: i === 0 ? 2 : 3,
+              x: spawn.x,
+              y: spawn.y,
+              aimAngle: spawn.aimAngle,
+              isAI: true,
+              name: `AI ${i + 1}`
+            });
+            fighter.aiIndex = i + 1;
+            this.enemies.push(fighter);
+          }
+
+          this.fighters = [this.hero, ...this.enemies];
+          this.items = new ItemSystem(this);
+          this.aiControllers = this.enemies.map(
+            (fighter, index) => new AIController(this, fighter, index)
+          );
+          this.collision = new CollisionSystem(this);
+          this.coverage = this.map.coverage();
+        }
+
+        bindUI() {
+          document.getElementById("startButton").addEventListener("click", () => this.start());
+          document.getElementById("resumeButton").addEventListener("click", () => this.resume());
+          document.getElementById("restartButton").addEventListener("click", () => this.restart());
+
+          window.addEventListener("keydown", (event) => {
+            if (event.repeat) return;
+            if (event.code === "Enter") {
+              event.preventDefault();
+              if (this.state === "ready" || this.state === "ended") this.restart();
+            } else if (event.code === "KeyP" || event.code === "Escape") {
+              event.preventDefault();
+              if (this.state === "playing") this.pause();
+              else if (this.state === "paused") this.resume();
+            }
+          });
+
+          window.addEventListener("resize", () => this.resize());
+          window.addEventListener("blur", () => {
+            if (this.state === "playing") this.pause();
+          });
+          document.addEventListener("visibilitychange", () => {
+            if (document.hidden && this.state === "playing") this.pause();
+          });
+        }
+
+        resize() {
+          const horizontalPadding = window.innerWidth < 720 ? 8 : 32;
+          const verticalPadding = window.innerWidth < 720 ? 8 : 32;
+          const fit = Math.min(
+            (window.innerWidth - horizontalPadding) / CONFIG.view.width,
+            (window.innerHeight - verticalPadding) / CONFIG.view.height
+          );
+
+          // 桌面端使用整数倍放大；极窄屏幕允许缩小以完整显示。
+          this.scale = fit >= 1 ? Math.floor(fit) : Math.max(0.38, fit);
+          this.gameFrame.style.setProperty("--scale", String(this.scale));
+        }
+
+        hideOverlays() {
+          this.startOverlay.classList.add("hidden");
+          this.pauseOverlay.classList.add("hidden");
+          this.resultOverlay.classList.add("hidden");
+        }
+
+        start() {
+          this.resetWorld();
+          this.state = "playing";
+          this.hideOverlays();
+          this.input.endLogicFrame();
+          this.canvas.focus({ preventScroll: true });
+          this.notify("SPREAD YOUR INK!", 1.4);
+        }
+
+        restart() {
+          this.start();
+        }
+
+        pause() {
+          if (this.state !== "playing") return;
+          this.state = "paused";
+          this.pauseOverlay.classList.remove("hidden");
+          this.input.endLogicFrame();
+        }
+
+        resume() {
+          if (this.state !== "paused") return;
+          this.state = "playing";
+          this.pauseOverlay.classList.add("hidden");
+          this.input.endLogicFrame();
+          this.canvas.focus({ preventScroll: true });
+        }
+
+        endMatch() {
+          if (this.state !== "playing") return;
+          this.coverage = this.map.coverage();
+          this.state = "ended";
+          this.input.endLogicFrame();
+
+          const orange = this.coverage.orangePercent;
+          const blue = this.coverage.bluePercent;
+          const lime = this.coverage.limePercent;
+          const neutral = (this.coverage.neutral / this.map.paintableCount) * 100;
+          const leaders = [
+            { count: this.coverage.orange, title: "橙队胜利" },
+            { count: this.coverage.blue, title: "蓝队胜利" },
+            { count: this.coverage.lime, title: "绿队胜利" }
+          ];
+          const maxCount = Math.max(...leaders.map((entry) => entry.count));
+          const winners = leaders.filter((entry) => entry.count === maxCount);
+
+          if (winners.length === 1) {
+            this.resultTitle.textContent = winners[0].title;
+          } else {
+            this.resultTitle.textContent = "平局";
+          }
+          this.resultScore.textContent =
+            `ORANGE ${orange.toFixed(1)}%  /  BLUE ${blue.toFixed(1)}%  /  LIME ${lime.toFixed(1)}%`;
+          this.resultNote.textContent =
+            `未被覆盖的地面：${neutral.toFixed(1)}%。按 Enter 或点击按钮再战。`;
+          this.resultOverlay.classList.remove("hidden");
+        }
+
+        notify(text, duration = 1.25) {
+          this.noticeText = text;
+          this.noticeTime = duration;
+        }
+
+        onDashStarted(fighter) {
+          this.effects.spawnInkBurst(
+            fighter.x - Math.cos(fighter.dashAngle) * 5,
+            fighter.y - Math.sin(fighter.dashAngle) * 5,
+            teamColor(fighter.team),
+            3,
+            25
+          );
+        }
+
+        onFighterRecovered(fighter) {
+          if (fighter !== this.hero) return;
+          this.notify("CONTROL RECOVERED", 0.7);
+        }
+
+        getNearestEnemy(team, x, y) {
+          let nearest = null;
+          let nearestDistance = Infinity;
+          for (const fighter of this.fighters) {
+            if (fighter.team === team) continue;
+            const dist = Math.hypot(fighter.x - x, fighter.y - y);
+            if (dist < nearestDistance) {
+              nearest = fighter;
+              nearestDistance = dist;
+            }
+          }
+          return nearest;
+        }
+
+        buildPlayerControls() {
+          const move = this.input.getMovement();
+          const arrowAim = this.input.getArrowAim();
+          let aimAngle = this.hero.aimAngle;
+
+          if (this.input.mouse.inside) {
+            const worldMouseY = this.input.mouse.y - CONFIG.view.playOffsetY;
+            const aimX = this.input.mouse.x - this.hero.x;
+            const aimY = worldMouseY - this.hero.y;
+            if (Math.hypot(aimX, aimY) > 1.5) {
+              aimAngle = Math.atan2(aimY, aimX);
+            }
+          } else if (arrowAim.length > 0) {
+            aimAngle = Math.atan2(arrowAim.y, arrowAim.x);
+          } else if (move.length > 0) {
+            aimAngle = Math.atan2(move.y, move.x);
+          }
+
+          return {
+            moveX: move.x,
+            moveY: move.y,
+            aimAngle,
+            dash: this.input.wasPressed("Space") || this.input.mousePressedThisFrame,
+            itemUse: this.input.wasPressed("KeyE")
+          };
+        }
+
+        update(dt) {
+          if (this.state !== "playing") return;
+
+          this.frame++;
+          this.elapsed += dt;
+          this.matchTime = Math.max(0, this.matchTime - dt);
+
+          // 固定顺序：玩家 -> AI -> 道具 -> 碰撞结算 -> 表现。
+          this.hero.update(dt, this.buildPlayerControls());
+          for (const controller of this.aiControllers) controller.update(dt);
+          this.items.update(dt);
+          this.collision.update();
+          this.effects.update(dt);
+          this.coverage = this.map.coverage();
+
+          this.input.endLogicFrame();
+          if (this.matchTime <= 0) this.endMatch();
+        }
+
+        render() {
+          this.renderer.render();
+        }
+      }
+
+      // ============================================================
+      // 12. GameLoop：固定 60Hz 逻辑更新，requestAnimationFrame 渲染
+      // ============================================================
+      class GameLoop {
+        constructor(game) {
+          this.game = game;
+          this.accumulator = 0;
+          this.lastTimestamp = 0;
+          this.running = false;
+          this.tick = this.tick.bind(this);
+        }
+
+        start() {
+          if (this.running) return;
+          this.running = true;
+          this.lastTimestamp = performance.now();
+          requestAnimationFrame(this.tick);
+        }
+
+        tick(timestamp) {
+          const frameDelta = Math.min(
+            (timestamp - this.lastTimestamp) / 1000,
+            CONFIG.maxFrameDelta
+          );
+          this.lastTimestamp = timestamp;
+
+          if (this.game.state === "playing") {
+            this.accumulator += frameDelta;
+            let updates = 0;
+            while (this.accumulator >= CONFIG.fixedStep && updates < 8) {
+              this.game.update(CONFIG.fixedStep);
+              this.accumulator -= CONFIG.fixedStep;
+              updates++;
+            }
+            if (updates >= 8) this.accumulator = 0;
+          } else {
+            this.accumulator = 0;
+          }
+
+          // 渲染频率跟随显示器；逻辑速度始终不受刷新率影响。
+          this.game.render();
+          requestAnimationFrame(this.tick);
+        }
+      }
+
+      // ============================================================
+      // 13. Bootstrap
+      // ============================================================
+      const canvas = document.getElementById("gameCanvas");
+      const input = new InputManager(canvas);
+      const game = new Game(canvas, input);
+      const gameLoop = new GameLoop(game);
+      gameLoop.start();
+
+      // 暴露只读调试入口，便于在控制台快速微调或自动化验收。
+      window.SPLAT_2D = {
+        game,
+        loop: gameLoop,
+        config: CONFIG
+      };
+    })();
+  </script>
+</body>
+</html>
